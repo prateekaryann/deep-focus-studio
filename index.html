@@ -110,195 +110,112 @@
        SCREEN: MAIN FOCUS SESSION
        ============================================================ -->
   <div class="screen" id="screen-focus">
-    <div class="focus-container">
 
-      <!-- Navigation Tabs -->
-      <nav class="nav-tabs">
-        <button class="nav-tab active" data-screen="screen-focus">Focus</button>
-        <button class="nav-tab" data-screen="screen-dashboard">Dashboard</button>
-        <button class="btn-icon" id="btn-fullscreen" title="Fullscreen (F)">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+    <!-- Minimal top bar -->
+    <div class="focus-topbar">
+      <div class="focus-goal" id="session-goal-text">Untitled Session</div>
+      <div class="focus-topbar-actions">
+        <button class="btn-icon btn-icon-sm" id="btn-fullscreen" title="Fullscreen (F)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
         </button>
-      </nav>
-
-      <!-- Session Goal -->
-      <div class="session-goal">
-        <span id="session-goal-text">Untitled Session</span>
+        <button class="btn-icon btn-icon-sm" data-screen="screen-dashboard" title="Dashboard">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 0h7v7h-7z"/></svg>
+        </button>
       </div>
+    </div>
 
-      <!-- Timer Section -->
-      <section class="timer-section">
-        <div class="timer-mode-badge" id="timer-mode">Free Flow</div>
-        <div class="timer-display" id="timer-display">00:00:00</div>
-        <div class="timer-progress-track">
-          <div class="timer-progress" id="timer-progress"></div>
-        </div>
-        <div class="timer-controls">
-          <button class="btn-icon" id="btn-timer-toggle" title="Play/Pause (Space)">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>
-          </button>
-          <button class="btn btn-secondary" id="btn-timer-reset">End Session</button>
-        </div>
-      </section>
+    <!-- Centered floating timer -->
+    <div class="focus-timer-float">
+      <div class="timer-mode-badge" id="timer-mode">Free Flow</div>
+      <div class="timer-display" id="timer-display">00:00:00</div>
+      <div class="timer-progress-track">
+        <div class="timer-progress" id="timer-progress"></div>
+      </div>
+    </div>
 
-      <!-- Audio Controls Grid -->
-      <div class="audio-grid">
+    <!-- Bottom action bar -->
+    <div class="focus-action-bar">
+      <button class="fab-btn" id="fab-tasks" title="Tasks">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span class="fab-label">Tasks</span>
+      </button>
+      <button class="fab-btn" id="fab-music" title="Music Controls">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <span class="fab-label">Music</span>
+      </button>
+      <button class="fab-btn" id="btn-timer-toggle" title="Play/Pause (Space)">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>
+      </button>
+      <button class="fab-btn" id="fab-notes" title="Notes">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span class="fab-label">Notes</span>
+      </button>
+      <button class="fab-btn fab-end" id="btn-timer-reset" title="End Session">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+        <span class="fab-label">End</span>
+      </button>
+    </div>
 
-        <!-- Binaural Beats -->
-        <div class="audio-card">
-          <div class="card-header">
-            <span class="card-title">
-              <svg class="card-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h4l3-9 3 18 3-9h4"/></svg>
-              Binaural Beats
-            </span>
-            <button class="toggle-switch active" id="binaural-toggle"></button>
-          </div>
-          <div class="brain-states">
-            <button class="state-btn" data-freq="6">
-              <div class="freq">&theta; Theta &middot; 6 Hz</div>
-              <div class="desc">Creative flow</div>
-            </button>
-            <button class="state-btn active" data-freq="10">
-              <div class="freq">&alpha; Alpha &middot; 10 Hz</div>
-              <div class="desc">Relaxed focus</div>
-            </button>
-            <button class="state-btn" data-freq="18">
-              <div class="freq">&beta; Beta &middot; 18 Hz</div>
-              <div class="desc">Active thinking</div>
-            </button>
-            <button class="state-btn" data-freq="40">
-              <div class="freq">&gamma; Gamma &middot; 40 Hz</div>
-              <div class="desc">Peak cognition</div>
-            </button>
-          </div>
+    <!-- Sliding Music Panel (right side) -->
+    <div class="slide-panel slide-panel-right" id="panel-music">
+      <div class="panel-header">
+        <h3 class="panel-title">Sound Controls</h3>
+        <button class="btn-icon btn-icon-sm panel-close" data-panel="panel-music">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="panel-body">
+        <!-- Master volume at top -->
+        <div class="panel-section">
           <div class="slider-group">
-            <div class="slider-label">
-              <span>Volume</span>
-              <span class="slider-value" id="binaural-vol-val">30</span>
-            </div>
-            <input type="range" id="binaural-vol" min="0" max="100" value="30">
+            <div class="slider-label"><span>Master Volume</span><span class="slider-value" id="master-vol-val">70</span></div>
+            <input type="range" id="master-vol" min="0" max="100" value="70">
           </div>
-        </div>
-
-        <!-- Noise Textures -->
-        <div class="audio-card">
-          <div class="card-header">
-            <span class="card-title">
-              <svg class="card-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-              Noise Textures
-            </span>
-            <button class="toggle-switch active" id="noise-toggle"></button>
-          </div>
-          <div class="slider-group">
-            <div class="slider-label"><span>Brown noise</span><span class="slider-value" id="brown-vol-val">40</span></div>
-            <input type="range" id="brown-vol" min="0" max="100" value="40">
-          </div>
-          <div class="slider-group">
-            <div class="slider-label"><span>Pink noise</span><span class="slider-value" id="pink-vol-val">0</span></div>
-            <input type="range" id="pink-vol" min="0" max="100" value="0">
-          </div>
-          <div class="slider-group">
-            <div class="slider-label"><span>White noise</span><span class="slider-value" id="white-vol-val">0</span></div>
-            <input type="range" id="white-vol" min="0" max="100" value="0">
-          </div>
-        </div>
-
-        <!-- Nature Sounds -->
-        <div class="audio-card">
-          <div class="card-header">
-            <span class="card-title">
-              <svg class="card-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 1 7 7c0 3-2 5-3 6.5S15 18 15 19H9c0-1-.5-2.5-1.5-3.5S5 12 5 9a7 7 0 0 1 7-7z"/></svg>
-              Nature Sounds
-            </span>
-            <button class="toggle-switch" id="nature-toggle"></button>
-          </div>
-          <div class="nature-types">
-            <button class="nature-btn active" data-type="rain">Rain</button>
-            <button class="nature-btn" data-type="ocean">Ocean</button>
-            <button class="nature-btn" data-type="forest">Forest</button>
-            <button class="nature-btn" data-type="fireplace">Fireplace</button>
-            <button class="nature-btn" data-type="cafe">Cafe</button>
-          </div>
-          <div class="slider-group">
-            <div class="slider-label"><span>Volume</span><span class="slider-value" id="nature-vol-val">50</span></div>
-            <input type="range" id="nature-vol" min="0" max="100" value="50">
-          </div>
-        </div>
-
-        <!-- Ambient Drone -->
-        <div class="audio-card">
-          <div class="card-header">
-            <span class="card-title">
-              <svg class="card-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-              Ambient Drone
-            </span>
-            <button class="toggle-switch" id="drone-toggle"></button>
-          </div>
-          <div class="slider-group">
-            <div class="slider-label"><span>Volume</span><span class="slider-value" id="drone-vol-val">25</span></div>
-            <input type="range" id="drone-vol" min="0" max="100" value="25">
-          </div>
-          <p class="card-hint">Low harmonic tones for grounding</p>
         </div>
 
         <!-- Music Centre -->
-        <div class="audio-card music-centre">
-          <div class="card-header">
-            <span class="card-title">
-              <svg class="card-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-              Music Centre
-            </span>
+        <div class="panel-section">
+          <h4 class="panel-section-title">Music</h4>
+          <div class="toggle-row">
+            <span>Enabled</span>
             <button class="toggle-switch" id="music-toggle"></button>
           </div>
-
-          <!-- Mood-based quick select -->
-          <div class="section-sublabel">Mood</div>
-          <div class="mood-grid">
+          <div class="mood-grid mood-grid-compact">
+            <button class="mood-btn active" data-preset="minimal" data-mood="focused">
+              <span class="mood-emoji">&#x1F3AF;</span>
+              <span class="mood-name">Focused</span>
+            </button>
             <button class="mood-btn" data-preset="ambienttechno" data-mood="calm">
               <span class="mood-emoji">&#x1F30A;</span>
               <span class="mood-name">Calm</span>
-              <span class="mood-desc">Atmospheric, floating</span>
             </button>
             <button class="mood-btn" data-preset="dubtechno" data-mood="deep">
               <span class="mood-emoji">&#x1F300;</span>
               <span class="mood-name">Deep</span>
-              <span class="mood-desc">Hypnotic, immersive</span>
-            </button>
-            <button class="mood-btn active" data-preset="minimal" data-mood="focused">
-              <span class="mood-emoji">&#x1F3AF;</span>
-              <span class="mood-name">Focused</span>
-              <span class="mood-desc">Minimal, steady</span>
             </button>
             <button class="mood-btn" data-preset="deephouse" data-mood="groove">
               <span class="mood-emoji">&#x1F3B5;</span>
               <span class="mood-name">Groove</span>
-              <span class="mood-desc">Funky, swinging</span>
             </button>
             <button class="mood-btn" data-preset="detroit" data-mood="drive">
               <span class="mood-emoji">&#x26A1;</span>
               <span class="mood-name">Drive</span>
-              <span class="mood-desc">Melodic, pushing</span>
             </button>
             <button class="mood-btn" data-preset="trance" data-mood="euphoric">
               <span class="mood-emoji">&#x2728;</span>
               <span class="mood-name">Euphoric</span>
-              <span class="mood-desc">Soaring, uplifting</span>
             </button>
             <button class="mood-btn" data-preset="progressive" data-mood="building">
               <span class="mood-emoji">&#x1F4C8;</span>
               <span class="mood-name">Building</span>
-              <span class="mood-desc">Evolving, layered</span>
             </button>
             <button class="mood-btn" data-preset="hardtechno" data-mood="intense">
               <span class="mood-emoji">&#x1F525;</span>
               <span class="mood-name">Intense</span>
-              <span class="mood-desc">Hard, industrial</span>
             </button>
           </div>
-
-          <!-- Genre pills (advanced - for users who know genres) -->
           <details class="genre-details">
-            <summary class="genre-summary">Genre select</summary>
+            <summary class="genre-summary">All genres</summary>
             <div class="genre-grid">
               <button class="music-preset-btn active" data-preset="minimal">Minimal</button>
               <button class="music-preset-btn" data-preset="detroit">Detroit</button>
@@ -312,103 +229,113 @@
               <button class="music-preset-btn" data-preset="hardtechno">Hard Techno</button>
             </div>
           </details>
-
-          <!-- Regenerate button -->
           <button class="btn btn-secondary btn-regenerate" id="btn-regenerate" title="Generate new variation">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             Regenerate
           </button>
-
-          <!-- Mixer -->
-          <div class="section-sublabel">Mixer</div>
-          <div class="slider-group">
-            <div class="slider-label"><span>Arpeggio</span><span class="slider-value" id="arp-vol-val">35</span></div>
-            <input type="range" id="arp-vol" min="0" max="100" value="35">
-          </div>
-          <div class="slider-group">
-            <div class="slider-label"><span>Pad / Chords</span><span class="slider-value" id="pad-vol-val">40</span></div>
-            <input type="range" id="pad-vol" min="0" max="100" value="40">
-          </div>
-          <div class="slider-group">
-            <div class="slider-label"><span>Drums</span><span class="slider-value" id="beat-vol-val">50</span></div>
-            <input type="range" id="beat-vol" min="0" max="100" value="50">
-          </div>
-          <div class="slider-group">
-            <div class="slider-label"><span>Bass</span><span class="slider-value" id="bass-vol-val">50</span></div>
-            <input type="range" id="bass-vol" min="0" max="100" value="50">
-          </div>
-
-          <!-- Beat Controls -->
+          <div class="slider-group"><div class="slider-label"><span>Arpeggio</span><span class="slider-value" id="arp-vol-val">35</span></div><input type="range" id="arp-vol" min="0" max="100" value="35"></div>
+          <div class="slider-group"><div class="slider-label"><span>Pad</span><span class="slider-value" id="pad-vol-val">40</span></div><input type="range" id="pad-vol" min="0" max="100" value="40"></div>
+          <div class="slider-group"><div class="slider-label"><span>Drums</span><span class="slider-value" id="beat-vol-val">50</span></div><input type="range" id="beat-vol" min="0" max="100" value="50"></div>
+          <div class="slider-group"><div class="slider-label"><span>Bass</span><span class="slider-value" id="bass-vol-val">50</span></div><input type="range" id="bass-vol" min="0" max="100" value="50"></div>
           <details class="genre-details">
             <summary class="genre-summary">Beat controls</summary>
-            <div class="slider-group">
-              <div class="slider-label"><span>BPM</span><span class="slider-value" id="bpm-val">128</span></div>
-              <input type="range" id="bpm-slider" min="70" max="180" value="128">
-            </div>
-            <div class="slider-group">
-              <div class="slider-label"><span>Swing</span><span class="slider-value" id="swing-val">0</span></div>
-              <input type="range" id="swing-slider" min="0" max="30" value="0">
-            </div>
-            <div class="slider-group">
-              <div class="slider-label"><span>Bass Filter</span><span class="slider-value" id="bass-cutoff-val">400</span></div>
-              <input type="range" id="bass-cutoff" min="100" max="5000" value="400">
-            </div>
-            <div class="slider-group">
-              <div class="slider-label"><span>Resonance</span><span class="slider-value" id="bass-reso-val">1</span></div>
-              <input type="range" id="bass-reso" min="0" max="20" value="1" step="0.5">
-            </div>
+            <div class="slider-group"><div class="slider-label"><span>BPM</span><span class="slider-value" id="bpm-val">128</span></div><input type="range" id="bpm-slider" min="70" max="180" value="128"></div>
+            <div class="slider-group"><div class="slider-label"><span>Swing</span><span class="slider-value" id="swing-val">0</span></div><input type="range" id="swing-slider" min="0" max="30" value="0"></div>
+            <div class="slider-group"><div class="slider-label"><span>Bass Filter</span><span class="slider-value" id="bass-cutoff-val">400</span></div><input type="range" id="bass-cutoff" min="100" max="5000" value="400"></div>
+            <div class="slider-group"><div class="slider-label"><span>Resonance</span><span class="slider-value" id="bass-reso-val">1</span></div><input type="range" id="bass-reso" min="0" max="20" value="1" step="0.5"></div>
           </details>
-
-          <p class="card-hint">All music procedurally generated &mdash; every play is unique</p>
         </div>
 
-        <!-- Tasks -->
-        <div class="audio-card tasks-section">
-          <div class="card-header">
-            <span class="card-title">
-              <svg class="card-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-              Session Tasks
-            </span>
+        <!-- Binaural -->
+        <div class="panel-section">
+          <h4 class="panel-section-title">Binaural Beats</h4>
+          <div class="toggle-row">
+            <span>Enabled</span>
+            <button class="toggle-switch active" id="binaural-toggle"></button>
           </div>
-          <div class="task-input-row">
-            <input type="text" class="task-input" id="task-input" placeholder="Add a task...">
-            <button class="btn btn-primary btn-sm" id="btn-add-task">Add</button>
+          <div class="brain-states">
+            <button class="state-btn" data-freq="6"><div class="freq">&theta; 6 Hz</div><div class="desc">Creative</div></button>
+            <button class="state-btn active" data-freq="10"><div class="freq">&alpha; 10 Hz</div><div class="desc">Focus</div></button>
+            <button class="state-btn" data-freq="18"><div class="freq">&beta; 18 Hz</div><div class="desc">Active</div></button>
+            <button class="state-btn" data-freq="40"><div class="freq">&gamma; 40 Hz</div><div class="desc">Peak</div></button>
           </div>
-          <ul class="task-list" id="task-list"></ul>
+          <div class="slider-group"><div class="slider-label"><span>Volume</span><span class="slider-value" id="binaural-vol-val">30</span></div><input type="range" id="binaural-vol" min="0" max="100" value="30"></div>
         </div>
-      </div>
 
-      <!-- Master Controls -->
-      <section class="master-section">
-        <div class="master-header">
-          <button class="master-btn" id="master-play">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            <span>Start Audio</span>
-          </button>
-          <div class="master-volume">
-            <span class="vol-label">Vol</span>
-            <input type="range" id="master-vol" min="0" max="100" value="70">
-            <span class="slider-value" id="master-vol-val">70</span>
+        <!-- Noise -->
+        <div class="panel-section">
+          <h4 class="panel-section-title">Noise</h4>
+          <div class="toggle-row">
+            <span>Enabled</span>
+            <button class="toggle-switch active" id="noise-toggle"></button>
           </div>
+          <div class="slider-group"><div class="slider-label"><span>Brown</span><span class="slider-value" id="brown-vol-val">40</span></div><input type="range" id="brown-vol" min="0" max="100" value="40"></div>
+          <div class="slider-group"><div class="slider-label"><span>Pink</span><span class="slider-value" id="pink-vol-val">0</span></div><input type="range" id="pink-vol" min="0" max="100" value="0"></div>
+          <div class="slider-group"><div class="slider-label"><span>White</span><span class="slider-value" id="white-vol-val">0</span></div><input type="range" id="white-vol" min="0" max="100" value="0"></div>
         </div>
-        <div class="visualizer" id="visualizer"></div>
-        <div class="notice">
+
+        <!-- Nature -->
+        <div class="panel-section">
+          <h4 class="panel-section-title">Nature</h4>
+          <div class="toggle-row">
+            <span>Enabled</span>
+            <button class="toggle-switch" id="nature-toggle"></button>
+          </div>
+          <div class="nature-types">
+            <button class="nature-btn active" data-type="rain">Rain</button>
+            <button class="nature-btn" data-type="ocean">Ocean</button>
+            <button class="nature-btn" data-type="forest">Forest</button>
+            <button class="nature-btn" data-type="fireplace">Fire</button>
+            <button class="nature-btn" data-type="cafe">Cafe</button>
+          </div>
+          <div class="slider-group"><div class="slider-label"><span>Volume</span><span class="slider-value" id="nature-vol-val">50</span></div><input type="range" id="nature-vol" min="0" max="100" value="50"></div>
+        </div>
+
+        <!-- Drone -->
+        <div class="panel-section">
+          <h4 class="panel-section-title">Drone</h4>
+          <div class="toggle-row">
+            <span>Enabled</span>
+            <button class="toggle-switch" id="drone-toggle"></button>
+          </div>
+          <div class="slider-group"><div class="slider-label"><span>Volume</span><span class="slider-value" id="drone-vol-val">25</span></div><input type="range" id="drone-vol" min="0" max="100" value="25"></div>
+        </div>
+
+        <div class="notice" style="margin-top:1rem;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
           Headphones recommended for binaural beats
         </div>
-      </section>
-
-      <!-- Session Notes -->
-      <section class="notes-section">
-        <label class="section-label" for="session-notes">Session Notes</label>
-        <textarea class="session-notes" id="session-notes" placeholder="Jot down thoughts, ideas, or reflections..."></textarea>
-      </section>
-
-      <!-- Shortcuts -->
-      <div class="shortcuts-hint">
-        <span>Space</span> play/pause &nbsp; <span>M</span> mute &nbsp; <span>F</span> fullscreen &nbsp; <span>Esc</span> exit
       </div>
     </div>
+
+    <!-- Sliding Tasks Panel (left side) -->
+    <div class="slide-panel slide-panel-left" id="panel-tasks">
+      <div class="panel-header">
+        <h3 class="panel-title">Tasks & Notes</h3>
+        <button class="btn-icon btn-icon-sm panel-close" data-panel="panel-tasks">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="panel-body">
+        <div class="panel-section">
+          <div class="task-input-row">
+            <input type="text" class="task-input" id="task-input" placeholder="Add a task...">
+            <button class="btn btn-primary btn-sm" id="btn-add-task">+</button>
+          </div>
+          <ul class="task-list" id="task-list"></ul>
+        </div>
+        <div class="panel-section">
+          <h4 class="panel-section-title">Session Notes</h4>
+          <textarea class="session-notes" id="session-notes" placeholder="Thoughts, ideas, reflections..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel backdrop (click to close) -->
+    <div class="panel-backdrop" id="panel-backdrop"></div>
+
+    <!-- Hidden visualizer for FFT bars (kept for data, not displayed prominently) -->
+    <div class="visualizer" id="visualizer" style="display:none;"></div>
   </div>
 
   <!-- ============================================================

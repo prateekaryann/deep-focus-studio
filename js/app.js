@@ -66,6 +66,16 @@
       });
     });
 
+    // Music preview on mood/preset selection (welcome screen)
+    // When user clicks a mood in welcome preset cards, preview that genre's music
+    document.querySelectorAll('.preset-card[data-preset]').forEach(card => {
+      // The existing click handler selects the preset
+      // Add audio preview: start a short preview of the music
+      card.addEventListener('click', () => {
+        previewMusic(card.dataset.preset);
+      });
+    });
+
     // Timer mode buttons
     document.querySelectorAll('.timer-preset-btn[data-minutes]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -83,6 +93,12 @@
   }
 
   function beginSession() {
+    // Stop any music preview
+    if (previewTimeout) { clearTimeout(previewTimeout); previewTimeout = null; }
+    if (audioEngine && audioEngine.playing) {
+      audioEngine.stop();
+    }
+
     const goal = (document.getElementById('goal-input')?.value || '').trim();
     const preset = selectedPreset || 'deep-work';
     const duration = selectedTimerMinutes;
@@ -427,6 +443,41 @@
       saveAudioSetting('bassReso', v);
     });
 
+    // Reverb mix
+    wireSlider('reverb-mix', v => {
+      if (audioEngine) audioEngine.setReverbMix(v / 100);
+      saveAudioSetting('reverbMix', v);
+    });
+
+    // Delay mix
+    wireSlider('delay-mix', v => {
+      if (audioEngine) audioEngine.setDelayMix(v / 100);
+      saveAudioSetting('delayMix', v);
+    });
+
+    // Density
+    wireSlider('density-slider', v => {
+      if (audioEngine) audioEngine.setDensity(v / 100);
+      saveAudioSetting('density', v);
+    });
+
+    // Pad Attack
+    wireSlider('pad-attack', v => {
+      if (audioEngine) audioEngine.setPadAttack(v / 100);
+      saveAudioSetting('padAttack', v);
+    });
+
+    // Arp pattern buttons
+    document.querySelectorAll('.arp-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.arp-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const pattern = btn.dataset.pattern;
+        if (audioEngine) audioEngine.setArpPattern(pattern);
+        saveAudioSetting('arpPattern', pattern);
+      });
+    });
+
     // Regenerate button
     const btnRegen = document.getElementById('btn-regenerate');
     if (btnRegen) {
@@ -454,6 +505,80 @@
     // Fullscreen
     const btnFs = document.getElementById('btn-fullscreen');
     if (btnFs) btnFs.addEventListener('click', toggleFullscreen);
+
+    // Panel toggle buttons
+    const fabMusic = document.getElementById('fab-music');
+    if (fabMusic) fabMusic.addEventListener('click', () => togglePanel('panel-music'));
+
+    const fabTasks = document.getElementById('fab-tasks');
+    if (fabTasks) fabTasks.addEventListener('click', () => togglePanel('panel-tasks'));
+
+    const fabNotes = document.getElementById('fab-notes');
+    if (fabNotes) {
+      fabNotes.addEventListener('click', () => {
+        togglePanel('panel-tasks');
+        // Focus the notes textarea when panel opens
+        setTimeout(() => {
+          const notes = document.getElementById('session-notes');
+          if (notes) notes.focus();
+        }, 400);
+      });
+    }
+
+    // Panel close buttons
+    document.querySelectorAll('.panel-close[data-panel]').forEach(btn => {
+      btn.addEventListener('click', () => closePanel(btn.dataset.panel));
+    });
+
+    // Backdrop click to close
+    const backdrop = document.getElementById('panel-backdrop');
+    if (backdrop) {
+      backdrop.addEventListener('click', () => closeAllPanels());
+    }
+
+    // Dashboard button in topbar
+    document.querySelectorAll('.focus-topbar-actions [data-screen]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        showScreen(btn.dataset.screen);
+        if (btn.dataset.screen === 'screen-dashboard') refreshDashboard();
+      });
+    });
+  }
+
+  // ─── Panel Management ──────────────────────────────────────────────
+
+  function togglePanel(panelId) {
+    const panel = document.getElementById(panelId);
+    const backdrop = document.getElementById('panel-backdrop');
+    if (!panel) return;
+
+    const isOpen = panel.classList.contains('open');
+
+    // Close other panels first
+    document.querySelectorAll('.slide-panel.open').forEach(p => {
+      if (p.id !== panelId) p.classList.remove('open');
+    });
+
+    if (isOpen) {
+      panel.classList.remove('open');
+      if (backdrop) backdrop.classList.remove('visible');
+    } else {
+      panel.classList.add('open');
+      if (backdrop) backdrop.classList.add('visible');
+    }
+  }
+
+  function closePanel(panelId) {
+    const panel = document.getElementById(panelId);
+    const backdrop = document.getElementById('panel-backdrop');
+    if (panel) panel.classList.remove('open');
+    if (backdrop) backdrop.classList.remove('visible');
+  }
+
+  function closeAllPanels() {
+    document.querySelectorAll('.slide-panel.open').forEach(p => p.classList.remove('open'));
+    const backdrop = document.getElementById('panel-backdrop');
+    if (backdrop) backdrop.classList.remove('visible');
   }
 
   // ─── Helper: Wire Toggle & Slider ───────────────────────────────────
@@ -506,6 +631,10 @@
       ['swing', 'swing-slider', v => audioEngine.setSwing(v / 100)],
       ['bassCutoff', 'bass-cutoff', v => audioEngine.setBassFilterCutoff(v)],
       ['bassReso', 'bass-reso', v => audioEngine.setBassFilterResonance(parseFloat(v))],
+      ['reverbMix', 'reverb-mix', v => audioEngine.setReverbMix(v / 100)],
+      ['delayMix', 'delay-mix', v => audioEngine.setDelayMix(v / 100)],
+      ['density', 'density-slider', v => audioEngine.setDensity(v / 100)],
+      ['padAttack', 'pad-attack', v => audioEngine.setPadAttack(v / 100)],
     ];
 
     mappings.forEach(([key, sliderId, fn]) => {
@@ -519,6 +648,15 @@
       }
     });
 
+    // Restore arp pattern
+    const savedArpPattern = sessionManager.getSetting('audio_arpPattern', null);
+    if (savedArpPattern) {
+      audioEngine.setArpPattern(savedArpPattern);
+      document.querySelectorAll('.arp-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.pattern === savedArpPattern);
+      });
+    }
+
     const savedFreq = sessionManager.getSetting('audio_binauralFreq', null);
     if (savedFreq !== null) {
       audioEngine.setBinauralFrequency(parseFloat(savedFreq));
@@ -530,6 +668,48 @@
 
     const savedMusicPreset = sessionManager.getSetting('audio_musicPreset', null);
     if (savedMusicPreset) audioEngine.setMusicPreset(savedMusicPreset);
+  }
+
+  // ─── Music Preview ─────────────────────────────────────────────────
+
+  let previewTimeout = null;
+
+  async function previewMusic(focusPreset) {
+    // Map focus presets to music presets
+    const musicMap = {
+      'deep-work': 'minimal',
+      'creative': 'ambienttechno',
+      'study': 'deephouse',
+      'meditation': 'dubtechno',
+      'energy': 'hardtechno'
+    };
+    const musicPreset = musicMap[focusPreset] || 'minimal';
+
+    // Initialize audio if needed
+    if (!audioEngine.initialized) {
+      try { await audioEngine.init(); } catch(e) { return; }
+    }
+
+    // Stop any current preview
+    if (previewTimeout) clearTimeout(previewTimeout);
+    if (audioEngine.playing) await audioEngine.stop();
+
+    // Apply the music preset
+    audioEngine.setMusicEnabled(true);
+    audioEngine.setMusicPreset(musicPreset);
+    audioEngine.setMasterVolume(0.5); // lower volume for preview
+
+    // Also update visualizer
+    if (vizBG && vizBG.setGenre) vizBG.setGenre(musicPreset);
+
+    // Start playing
+    audioEngine.start();
+    startVisualizer();
+
+    // Auto-stop preview after 8 seconds
+    previewTimeout = setTimeout(async () => {
+      if (audioEngine.playing) await audioEngine.stop();
+    }, 8000);
   }
 
   // ─── Background Theme ───────────────────────────────────────────────
@@ -962,7 +1142,11 @@
           toggleFullscreen();
           break;
         case 'Escape':
-          exitFullscreen();
+          if (document.querySelector('.slide-panel.open')) {
+            closeAllPanels();
+          } else {
+            exitFullscreen();
+          }
           break;
       }
     });
