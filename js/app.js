@@ -11,6 +11,7 @@
   let timerInterval = null;
   let vizAnimFrame = null;
   let breathingTimeout = null;
+  let vizBG = null;
   let selectedPreset = null;
   let selectedTimerMinutes = 25;
   let pomodoroCount = 0;
@@ -537,6 +538,12 @@
     else if (freq < 12) document.body.classList.add('theme-alpha');
     else if (freq < 30) document.body.classList.add('theme-beta');
     else document.body.classList.add('theme-gamma');
+    if (vizBG) {
+      if (freq < 8) vizBG.setTheme('theta');
+      else if (freq < 12) vizBG.setTheme('alpha');
+      else if (freq < 30) vizBG.setTheme('beta');
+      else vizBG.setTheme('gamma');
+    }
   }
 
   // ─── Visualizer ─────────────────────────────────────────────────────
@@ -574,6 +581,12 @@
         const val = (data[idx] + 140) / 140; // FFT dB normalize
         bar.style.height = Math.max(4, val * 50) + 'px';
       });
+    }
+    if (vizBG) {
+      vizBG.update(
+        audioEngine ? audioEngine.getFrequencyData() : null,
+        audioEngine ? audioEngine.getWaveformData() : null
+      );
     }
     vizAnimFrame = requestAnimationFrame(updateVisualizer);
   }
@@ -998,6 +1011,12 @@
     initKeyboardShortcuts();
     initBreathingExercise();
     initVisualizer();
+    if (window.VisualizerBG) {
+      const bgEl = document.getElementById('bg-canvas');
+      if (bgEl) {
+        vizBG = new VisualizerBG(bgEl);
+      }
+    }
     showRandomTip();
   });
 

@@ -94,6 +94,13 @@ input, textarea, button, select {
   animation: bgShift 30s ease infinite;
 }
 
+.bg-canvas canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .bg-canvas::after {
   content: "";
   position: absolute;
