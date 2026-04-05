@@ -351,9 +351,49 @@
       btn.addEventListener('click', () => {
         document.querySelectorAll('.music-preset-btn[data-preset]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        if (audioEngine) audioEngine.setMusicPreset(btn.dataset.preset);
+        if (audioEngine) {
+          audioEngine.setMusicPreset(btn.dataset.preset);
+          // Sync BPM and swing sliders to the new preset
+          const bpm = audioEngine.getBPM();
+          const bpmSlider = document.getElementById('bpm-slider');
+          const bpmVal = document.getElementById('bpm-val');
+          if (bpmSlider) bpmSlider.value = Math.round(bpm);
+          if (bpmVal) bpmVal.textContent = Math.round(bpm);
+        }
         saveAudioSetting('musicPreset', btn.dataset.preset);
       });
+    });
+
+    // Bass volume
+    wireSlider('bass-vol', v => {
+      if (audioEngine && audioEngine._nodes && audioEngine._nodes.bassGain) {
+        audioEngine._nodes.bassGain.gain.rampTo(v / 100, 0.05);
+      }
+      saveAudioSetting('bassVol', v);
+    });
+
+    // BPM control
+    wireSlider('bpm-slider', v => {
+      if (audioEngine) audioEngine.setBPM(v);
+      saveAudioSetting('bpm', v);
+    });
+
+    // Swing control
+    wireSlider('swing-slider', v => {
+      if (audioEngine) audioEngine.setSwing(v / 100);
+      saveAudioSetting('swing', v);
+    });
+
+    // Bass filter cutoff
+    wireSlider('bass-cutoff', v => {
+      if (audioEngine) audioEngine.setBassFilterCutoff(v);
+      saveAudioSetting('bassCutoff', v);
+    });
+
+    // Bass filter resonance
+    wireSlider('bass-reso', v => {
+      if (audioEngine) audioEngine.setBassFilterResonance(parseFloat(v));
+      saveAudioSetting('bassReso', v);
     });
 
     // Task management
@@ -393,8 +433,8 @@
     if (!el) return;
     const valEl = document.getElementById(id + '-val');
     el.addEventListener('input', () => {
-      const v = parseInt(el.value, 10);
-      if (valEl) valEl.textContent = v;
+      const v = parseFloat(el.value);
+      if (valEl) valEl.textContent = Number.isInteger(v) ? v : v.toFixed(1);
       callback(v);
     });
   }
@@ -417,6 +457,11 @@
       ['arpVol', 'arp-vol', v => audioEngine.setArpVolume(v / 100)],
       ['padVol', 'pad-vol', v => audioEngine.setPadVolume(v / 100)],
       ['beatVol', 'beat-vol', v => audioEngine.setBeatVolume(v / 100)],
+      ['bassVol', 'bass-vol', v => { if (audioEngine._nodes && audioEngine._nodes.bassGain) audioEngine._nodes.bassGain.gain.rampTo(v / 100, 0.05); }],
+      ['bpm', 'bpm-slider', v => audioEngine.setBPM(v)],
+      ['swing', 'swing-slider', v => audioEngine.setSwing(v / 100)],
+      ['bassCutoff', 'bass-cutoff', v => audioEngine.setBassFilterCutoff(v)],
+      ['bassReso', 'bass-reso', v => audioEngine.setBassFilterResonance(parseFloat(v))],
     ];
 
     mappings.forEach(([key, sliderId, fn]) => {

@@ -241,35 +241,73 @@
           <p class="card-hint">Low harmonic tones for grounding</p>
         </div>
 
-        <!-- Music -->
-        <div class="audio-card">
+        <!-- Music Centre -->
+        <div class="audio-card music-centre">
           <div class="card-header">
             <span class="card-title">
               <svg class="card-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-              Music
+              Music Centre
             </span>
             <button class="toggle-switch" id="music-toggle"></button>
           </div>
-          <div class="edm-presets">
-            <button class="music-preset-btn active" data-preset="ambient">Ambient</button>
-            <button class="music-preset-btn" data-preset="lofi">Lo-fi</button>
-            <button class="music-preset-btn" data-preset="deep">Deep House</button>
-            <button class="music-preset-btn" data-preset="synthwave">Synthwave</button>
-            <button class="music-preset-btn" data-preset="piano">Piano</button>
-            <button class="music-preset-btn" data-preset="jazz">Jazz</button>
+
+          <!-- Genre Selection -->
+          <div class="section-sublabel">Genre</div>
+          <div class="genre-grid">
+            <button class="music-preset-btn active" data-preset="minimal">Minimal</button>
+            <button class="music-preset-btn" data-preset="detroit">Detroit</button>
+            <button class="music-preset-btn" data-preset="acid">Acid</button>
+            <button class="music-preset-btn" data-preset="dubtechno">Dub Techno</button>
+            <button class="music-preset-btn" data-preset="trance">Trance</button>
+            <button class="music-preset-btn" data-preset="dnb">Drum & Bass</button>
+            <button class="music-preset-btn" data-preset="deephouse">Deep House</button>
+            <button class="music-preset-btn" data-preset="progressive">Progressive</button>
+            <button class="music-preset-btn" data-preset="ambienttechno">Ambient Techno</button>
+            <button class="music-preset-btn" data-preset="hardtechno">Hard Techno</button>
           </div>
+
+          <!-- Mixer -->
+          <div class="section-sublabel">Mixer</div>
           <div class="slider-group">
             <div class="slider-label"><span>Arpeggio</span><span class="slider-value" id="arp-vol-val">35</span></div>
             <input type="range" id="arp-vol" min="0" max="100" value="35">
           </div>
           <div class="slider-group">
-            <div class="slider-label"><span>Pad</span><span class="slider-value" id="pad-vol-val">40</span></div>
+            <div class="slider-label"><span>Pad / Chords</span><span class="slider-value" id="pad-vol-val">40</span></div>
             <input type="range" id="pad-vol" min="0" max="100" value="40">
           </div>
           <div class="slider-group">
-            <div class="slider-label"><span>Beat</span><span class="slider-value" id="beat-vol-val">0</span></div>
-            <input type="range" id="beat-vol" min="0" max="100" value="0">
+            <div class="slider-label"><span>Drums</span><span class="slider-value" id="beat-vol-val">50</span></div>
+            <input type="range" id="beat-vol" min="0" max="100" value="50">
           </div>
+          <div class="slider-group">
+            <div class="slider-label"><span>Bass</span><span class="slider-value" id="bass-vol-val">50</span></div>
+            <input type="range" id="bass-vol" min="0" max="100" value="50">
+          </div>
+
+          <!-- Beat Controls -->
+          <div class="section-sublabel">Beat Controls</div>
+          <div class="slider-group">
+            <div class="slider-label"><span>BPM</span><span class="slider-value" id="bpm-val">128</span></div>
+            <input type="range" id="bpm-slider" min="70" max="180" value="128">
+          </div>
+          <div class="slider-group">
+            <div class="slider-label"><span>Swing</span><span class="slider-value" id="swing-val">0</span></div>
+            <input type="range" id="swing-slider" min="0" max="30" value="0">
+          </div>
+
+          <!-- Bass Filter -->
+          <div class="section-sublabel">Bass Filter</div>
+          <div class="slider-group">
+            <div class="slider-label"><span>Cutoff</span><span class="slider-value" id="bass-cutoff-val">400</span></div>
+            <input type="range" id="bass-cutoff" min="100" max="5000" value="400">
+          </div>
+          <div class="slider-group">
+            <div class="slider-label"><span>Resonance</span><span class="slider-value" id="bass-reso-val">1</span></div>
+            <input type="range" id="bass-reso" min="0" max="20" value="1" step="0.5">
+          </div>
+
+          <p class="card-hint">All music is procedurally generated &mdash; no samples, no licensing issues</p>
         </div>
 
         <!-- Tasks -->

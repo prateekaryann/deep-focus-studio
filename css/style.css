@@ -1335,6 +1335,32 @@ button:focus-visible,
   font-size: 0.8rem;
 }
 
+/* Music Centre */
+.music-centre {
+  grid-column: 1 / -1; /* span full width */
+}
+
+.genre-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.section-sublabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  margin-top: 1rem;
+}
+
+.section-sublabel:first-of-type {
+  margin-top: 0;
+}
+
 /* Music preset buttons */
 .music-preset-btn {
   padding: 0.4rem 1rem;

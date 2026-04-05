@@ -30,55 +30,159 @@ const CHORDS = {
 };
 
 const MUSIC_PRESETS = {
-  ambient: {
-    bpm: 75,
-    chords: ['Cmaj7', 'Am7', 'Fmaj7', 'G7'],
-    oscType: 'sine',
-    padAttack: 1.5, padRelease: 3, padDecay: 2,
-    arpOsc: 'triangle', arpOctave: 4,
-    beatVol: -20,
+  minimal: {
+    name: 'Minimal Techno',
+    bpm: 128,
+    chords: ['Am', 'Am', 'Em', 'Em'],
+    padOsc: 'sine', padAttack: 2, padDecay: 2, padSustain: 0.3, padRelease: 3,
+    arpOsc: 'sine', arpOctave: 5, arpPattern: 'up',
+    bassOsc: 'sine', bassFilterFreq: 400, bassFilterQ: 1,
+    kickDecay: 0.3, kickOctaves: 6, kickPitchDecay: 0.05,
+    hatStyle: '16ths', hatDecay: 0.04,
+    beatPattern: 'four-on-floor',
+    snareOn: [4, 12],
+    swing: 0,
+    effects: { padReverb: 3, padDelay: '8n.', padDelayFeedback: 0.4, arpDelay: '16n', arpDelayFeedback: 0.3 },
+    bassPattern: [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
   },
-  lofi: {
-    bpm: 80,
-    chords: ['Dm7', 'G7', 'Cmaj7', 'Am7'],
-    oscType: 'triangle',
-    padAttack: 0.8, padRelease: 2, padDecay: 1.5,
-    arpOsc: 'sine', arpOctave: 4,
-    beatVol: -12,
+  detroit: {
+    name: 'Detroit Techno',
+    bpm: 132,
+    chords: ['Am7', 'Dm7', 'Fmaj7', 'Em7'],
+    padOsc: 'sawtooth', padAttack: 0.8, padDecay: 1.5, padSustain: 0.6, padRelease: 2,
+    arpOsc: 'sawtooth', arpOctave: 4, arpPattern: 'up-down',
+    bassOsc: 'sawtooth', bassFilterFreq: 800, bassFilterQ: 2,
+    kickDecay: 0.4, kickOctaves: 6, kickPitchDecay: 0.05,
+    hatStyle: 'offbeat-8ths', hatDecay: 0.06,
+    beatPattern: 'four-on-floor',
+    snareOn: [4, 12],
+    swing: 0,
+    effects: { padReverb: 4, padDelay: '4n', padDelayFeedback: 0.3, arpDelay: '8n', arpDelayFeedback: 0.25 },
+    bassPattern: [1,0,1,0, 0,0,1,0, 1,0,0,1, 0,0,1,0],
   },
-  deep: {
-    bpm: 120,
-    chords: ['Am', 'Fm', 'Dm', 'Em'],
-    oscType: 'sine',
-    padAttack: 0.5, padRelease: 2, padDecay: 1,
-    arpOsc: 'triangle', arpOctave: 3,
-    beatVol: -8,
+  acid: {
+    name: 'Acid Techno',
+    bpm: 136,
+    chords: ['Am', 'Am', 'Am', 'Am'],
+    padOsc: 'sawtooth', padAttack: 0.01, padDecay: 0.3, padSustain: 0.1, padRelease: 0.5,
+    arpOsc: 'sawtooth', arpOctave: 3, arpPattern: 'random',
+    bassOsc: 'sawtooth', bassFilterFreq: 300, bassFilterQ: 12,
+    kickDecay: 0.3, kickOctaves: 6, kickPitchDecay: 0.04,
+    hatStyle: '16ths', hatDecay: 0.03,
+    beatPattern: 'four-on-floor',
+    snareOn: [4, 12],
+    swing: 0,
+    acid303: true,
+    effects: { padReverb: 1, padDelay: '16n', padDelayFeedback: 0.2, arpDelay: '8n', arpDelayFeedback: 0.15 },
+    bassPattern: [1,0,1,1, 0,1,1,0, 1,1,0,1, 0,1,0,1],
   },
-  synthwave: {
-    bpm: 110,
-    chords: ['Em', 'C', 'G', 'D'],
-    oscType: 'sawtooth',
-    padAttack: 0.3, padRelease: 1.5, padDecay: 1,
-    arpOsc: 'sawtooth', arpOctave: 4,
-    beatVol: -10,
-    filterSweep: true,
+  dubtechno: {
+    name: 'Dub Techno',
+    bpm: 124,
+    chords: ['Dm7', 'Am7', 'Dm7', 'Am7'],
+    padOsc: 'sawtooth', padAttack: 1.5, padDecay: 2, padSustain: 0.5, padRelease: 4,
+    arpOsc: 'triangle', arpOctave: 4, arpPattern: 'up',
+    bassOsc: 'sine', bassFilterFreq: 300, bassFilterQ: 1,
+    kickDecay: 0.6, kickOctaves: 4, kickPitchDecay: 0.08,
+    hatStyle: 'sparse', hatDecay: 0.08,
+    beatPattern: 'four-on-floor',
+    snareOn: [4, 12],
+    swing: 0,
+    effects: { padReverb: 8, padDelay: '4n.', padDelayFeedback: 0.65, arpDelay: '8n.', arpDelayFeedback: 0.5 },
+    bassPattern: [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
   },
-  piano: {
-    bpm: 70,
-    chords: ['Cmaj7', 'Dm7', 'Em7', 'Fmaj7'],
-    oscType: 'triangle',
-    padAttack: 0.01, padRelease: 0.8, padDecay: 0.1,
-    arpOsc: 'triangle', arpOctave: 5,
-    beatVol: -30,
+  trance: {
+    name: 'Trance',
+    bpm: 140,
+    chords: ['Am', 'Fmaj7', 'C', 'G'],
+    padOsc: 'sawtooth', padAttack: 0.5, padDecay: 1, padSustain: 0.8, padRelease: 2,
+    arpOsc: 'sawtooth', arpOctave: 5, arpPattern: 'up',
+    bassOsc: 'sawtooth', bassFilterFreq: 600, bassFilterQ: 3,
+    kickDecay: 0.35, kickOctaves: 5, kickPitchDecay: 0.04,
+    hatStyle: 'offbeat-8ths', hatDecay: 0.05,
+    beatPattern: 'four-on-floor',
+    snareOn: [4, 12],
+    swing: 0,
+    supersaw: true,
+    effects: { padReverb: 5, padDelay: '8n', padDelayFeedback: 0.3, arpDelay: '16n', arpDelayFeedback: 0.35 },
+    bassPattern: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
   },
-  jazz: {
-    bpm: 85,
-    chords: ['Dm9', 'G13', 'Cmaj9', 'A7b9'],
-    oscType: 'sine',
-    padAttack: 0.4, padRelease: 2.5, padDecay: 1.5,
-    arpOsc: 'sine', arpOctave: 4,
-    beatVol: -14,
+  dnb: {
+    name: 'Drum & Bass',
+    bpm: 174,
+    chords: ['Am7', 'Fmaj7', 'Cmaj7', 'Em7'],
+    padOsc: 'triangle', padAttack: 1, padDecay: 2, padSustain: 0.6, padRelease: 3,
+    arpOsc: 'triangle', arpOctave: 5, arpPattern: 'up-down',
+    bassOsc: 'sine', bassFilterFreq: 500, bassFilterQ: 2,
+    kickDecay: 0.15, kickOctaves: 8, kickPitchDecay: 0.03,
+    hatStyle: 'breakbeat', hatDecay: 0.04,
+    beatPattern: 'breakbeat',
+    snareOn: [4, 12],
+    swing: 0.1,
+    effects: { padReverb: 4, padDelay: '4n', padDelayFeedback: 0.3, arpDelay: '8n', arpDelayFeedback: 0.2 },
+    bassPattern: [1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,1],
+  },
+  deephouse: {
+    name: 'Deep House',
+    bpm: 122,
+    chords: ['Dm9', 'G13', 'Cmaj9', 'Am7'],
+    padOsc: 'triangle', padAttack: 0.5, padDecay: 1, padSustain: 0.7, padRelease: 2,
+    arpOsc: 'sine', arpOctave: 4, arpPattern: 'up',
+    bassOsc: 'sine', bassFilterFreq: 600, bassFilterQ: 1,
+    kickDecay: 0.6, kickOctaves: 4, kickPitchDecay: 0.08,
+    hatStyle: 'offbeat-8ths', hatDecay: 0.06,
+    beatPattern: 'four-on-floor',
+    snareOn: [4, 12],
+    swing: 0.15,
+    effects: { padReverb: 3, padDelay: '8n.', padDelayFeedback: 0.25, arpDelay: '16n', arpDelayFeedback: 0.2 },
+    bassPattern: [1,0,0,0, 1,0,0,1, 0,0,1,0, 0,0,1,0],
     walkingBass: true,
+  },
+  progressive: {
+    name: 'Progressive House',
+    bpm: 128,
+    chords: ['Em7', 'Cmaj7', 'G', 'D'],
+    padOsc: 'sawtooth', padAttack: 2, padDecay: 3, padSustain: 0.4, padRelease: 4,
+    arpOsc: 'sawtooth', arpOctave: 4, arpPattern: 'up',
+    bassOsc: 'sawtooth', bassFilterFreq: 500, bassFilterQ: 3,
+    kickDecay: 0.4, kickOctaves: 5, kickPitchDecay: 0.05,
+    hatStyle: '16ths', hatDecay: 0.04,
+    beatPattern: 'four-on-floor',
+    snareOn: [4, 12],
+    swing: 0,
+    effects: { padReverb: 5, padDelay: '4n', padDelayFeedback: 0.35, arpDelay: '8n.', arpDelayFeedback: 0.3 },
+    bassPattern: [1,0,1,0, 0,1,0,0, 1,0,0,1, 0,1,0,0],
+  },
+  ambienttechno: {
+    name: 'Ambient Techno',
+    bpm: 110,
+    chords: ['Am7', 'Fmaj7', 'Cmaj7', 'Em7'],
+    padOsc: 'sine', padAttack: 3, padDecay: 4, padSustain: 0.5, padRelease: 5,
+    arpOsc: 'sine', arpOctave: 5, arpPattern: 'random',
+    bassOsc: 'sine', bassFilterFreq: 300, bassFilterQ: 1,
+    kickDecay: 0.5, kickOctaves: 3, kickPitchDecay: 0.1,
+    hatStyle: 'sparse', hatDecay: 0.1,
+    beatPattern: 'half-time',
+    snareOn: [8],
+    swing: 0,
+    effects: { padReverb: 10, padDelay: '4n.', padDelayFeedback: 0.6, arpDelay: '4n', arpDelayFeedback: 0.5 },
+    bassPattern: [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+  },
+  hardtechno: {
+    name: 'Hard Techno',
+    bpm: 145,
+    chords: ['Am', 'Am', 'Em', 'Em'],
+    padOsc: 'square', padAttack: 0.01, padDecay: 0.2, padSustain: 0.3, padRelease: 0.3,
+    arpOsc: 'square', arpOctave: 4, arpPattern: 'down',
+    bassOsc: 'square', bassFilterFreq: 1200, bassFilterQ: 4,
+    kickDecay: 0.2, kickOctaves: 8, kickPitchDecay: 0.03,
+    hatStyle: '16ths', hatDecay: 0.02,
+    beatPattern: 'four-on-floor',
+    snareOn: [4, 12],
+    swing: 0,
+    distorted: true,
+    effects: { padReverb: 2, padDelay: '16n', padDelayFeedback: 0.15, arpDelay: '8n', arpDelayFeedback: 0.2 },
+    bassPattern: [1,1,0,1, 1,0,1,1, 0,1,1,0, 1,1,0,1],
   },
 };
 
@@ -107,11 +211,14 @@ class AudioEngine {
     this._droneVolume = 0.3;
     this._natureType = 'rain';
     this._natureVolume = 0.5;
-    this._musicPreset = 'ambient';
+    this._musicPreset = 'minimal';
     this._arpVolume = 0.3;
     this._padVolume = 0.4;
     this._beatVolume = 0.3;
     this._masterVolume = 0.7;
+    this._swing = 0;
+    this._bassFilterCutoff = 400;
+    this._bassFilterQ = 1;
 
     // Audio nodes (created in init)
     this._nodes = {};
@@ -517,6 +624,7 @@ class AudioEngine {
     n.arpGain = new Tone.Gain(0).connect(n.musicGain);
     n.padGain = new Tone.Gain(0).connect(n.musicGain);
     n.beatGain = new Tone.Gain(0).connect(n.musicGain);
+    n.bassGain = new Tone.Gain(0).connect(n.musicGain);
     this._musicParts = [];
     this._musicSynths = [];
   }
@@ -540,68 +648,156 @@ class AudioEngine {
     n.arpGain.gain.rampTo(this._arpVolume, RAMP);
     n.padGain.gain.rampTo(this._padVolume, RAMP);
     n.beatGain.gain.rampTo(this._beatVolume, RAMP);
+    n.bassGain.gain.rampTo(this._padVolume * 0.8, RAMP);
     n.musicGain.gain.rampTo(1, RAMP);
 
-    // --- Pad synth ---
-    const padSynth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 4,
-      voice: Tone.Synth,
-      options: {
-        oscillator: { type: preset.oscType },
-        envelope: {
-          attack: preset.padAttack,
-          decay: preset.padDecay,
-          sustain: 0.6,
-          release: preset.padRelease,
-        },
-        volume: -6,
-      },
-    });
-
-    // Optional filter sweep for synthwave
-    if (preset.filterSweep) {
-      const autoFilter = new Tone.AutoFilter('2m', 200, 4000).connect(n.padGain);
-      autoFilter.start();
-      padSynth.connect(autoFilter);
-      this._musicSynths.push(autoFilter);
-    } else {
-      padSynth.connect(n.padGain);
-    }
-    this._musicSynths.push(padSynth);
-
-    // Pad part: plays full chord every bar
     const chordNames = preset.chords;
-    const padPart = new Tone.Part((time, chord) => {
-      const notes = CHORDS[chord];
-      if (!notes) return;
-      padSynth.triggerAttackRelease(notes, '1m', time);
-    }, chordNames.map((c, i) => [i * Tone.Time('1m').toSeconds(), c]));
-    padPart.loop = true;
-    padPart.loopEnd = chordNames.length * Tone.Time('1m').toSeconds();
-    padPart.start(0);
-    this._musicParts.push(padPart);
+    const barLen = Tone.Time('1m').toSeconds();
+    const stepLen16 = Tone.Time('16n').toSeconds();
+    const swing = this._swing !== undefined ? this._swing : (preset.swing || 0);
+
+    /** Apply swing offset to a 16th-note step within a bar */
+    function getSwungTime(step, swingAmt) {
+      const pos = step % 16;
+      const baseTime = stepLen16 * pos;
+      if (pos % 2 === 1) {
+        return baseTime + swingAmt * stepLen16;
+      }
+      return baseTime;
+    }
+
+    // --- Pad synth ---
+    let padDest = n.padGain;
+
+    // Pad reverb
+    const padReverb = new Tone.Reverb({
+      decay: preset.effects.padReverb || 3,
+      wet: 0.3,
+    }).connect(n.padGain);
+    this._musicSynths.push(padReverb);
+
+    // Pad delay
+    const padDelay = new Tone.FeedbackDelay({
+      delayTime: preset.effects.padDelay || '8n',
+      feedback: preset.effects.padDelayFeedback || 0.3,
+      wet: 0.2,
+    }).connect(padReverb);
+    this._musicSynths.push(padDelay);
+    padDest = padDelay;
+
+    // Distortion for hard techno
+    if (preset.distorted) {
+      const dist = new Tone.Distortion({ distortion: 0.6 }).connect(padDest);
+      padDest = dist;
+      this._musicSynths.push(dist);
+    }
+
+    if (preset.supersaw) {
+      // Supersaw: 3 detuned PolySynths
+      const detunes = [-15, 0, 15];
+      detunes.forEach(detune => {
+        const synth = new Tone.PolySynth(Tone.Synth, {
+          maxPolyphony: 6,
+          voice: Tone.Synth,
+          options: {
+            oscillator: { type: preset.padOsc, detune: detune },
+            envelope: {
+              attack: preset.padAttack, decay: preset.padDecay,
+              sustain: preset.padSustain || 0.6, release: preset.padRelease,
+            },
+            volume: -10,
+          },
+        }).connect(padDest);
+        this._musicSynths.push(synth);
+
+        const padPart = new Tone.Part((time, chord) => {
+          const notes = CHORDS[chord];
+          if (!notes) return;
+          synth.triggerAttackRelease(notes, '1m', time);
+        }, chordNames.map((c, i) => [i * barLen, c]));
+        padPart.loop = true;
+        padPart.loopEnd = chordNames.length * barLen;
+        padPart.start(0);
+        this._musicParts.push(padPart);
+      });
+    } else {
+      const padSynth = new Tone.PolySynth(Tone.Synth, {
+        maxPolyphony: 6,
+        voice: Tone.Synth,
+        options: {
+          oscillator: { type: preset.padOsc || 'sine' },
+          envelope: {
+            attack: preset.padAttack, decay: preset.padDecay,
+            sustain: preset.padSustain || 0.6, release: preset.padRelease,
+          },
+          volume: -6,
+        },
+      }).connect(padDest);
+      this._musicSynths.push(padSynth);
+
+      const padPart = new Tone.Part((time, chord) => {
+        const notes = CHORDS[chord];
+        if (!notes) return;
+        padSynth.triggerAttackRelease(notes, '1m', time);
+      }, chordNames.map((c, i) => [i * barLen, c]));
+      padPart.loop = true;
+      padPart.loopEnd = chordNames.length * barLen;
+      padPart.start(0);
+      this._musicParts.push(padPart);
+    }
 
     // --- Arp synth ---
+    const arpDelay = new Tone.FeedbackDelay({
+      delayTime: preset.effects.arpDelay || '16n',
+      feedback: preset.effects.arpDelayFeedback || 0.3,
+      wet: 0.25,
+    }).connect(n.arpGain);
+    this._musicSynths.push(arpDelay);
+
     const arpSynth = new Tone.Synth({
       oscillator: { type: preset.arpOsc },
       envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.3 },
       volume: -10,
-    }).connect(n.arpGain);
+    }).connect(arpDelay);
     this._musicSynths.push(arpSynth);
 
-    // Arp pattern: arpeggiate each chord's notes across the bar
+    // Build arp events with pattern support
     const arpEvents = [];
-    const barLen = Tone.Time('1m').toSeconds();
-    const stepLen = Tone.Time('8n').toSeconds();
+    const arpPattern = preset.arpPattern || 'up';
     chordNames.forEach((chordName, ci) => {
       const notes = CHORDS[chordName];
       if (!notes) return;
+      // Generate ordered note list for arp pattern
+      let orderedNotes;
+      switch (arpPattern) {
+        case 'down':
+          orderedNotes = [...notes].reverse();
+          break;
+        case 'up-down': {
+          const up = [...notes];
+          const down = [...notes].reverse().slice(1, -1);
+          orderedNotes = up.concat(down);
+          break;
+        }
+        case 'random':
+          orderedNotes = null; // handled per-step
+          break;
+        case 'up':
+        default:
+          orderedNotes = [...notes];
+          break;
+      }
       for (let s = 0; s < 8; s++) {
-        const note = notes[s % notes.length];
-        // Shift arp to requested octave
+        let note;
+        if (arpPattern === 'random') {
+          note = notes[Math.floor(Math.random() * notes.length)];
+        } else {
+          note = orderedNotes[s % orderedNotes.length];
+        }
         const letter = note.replace(/[0-9]/g, '');
         const arpNote = letter + preset.arpOctave;
-        arpEvents.push([ci * barLen + s * stepLen, arpNote]);
+        const t = ci * barLen + getSwungTime(s * 2, swing);
+        arpEvents.push([t, arpNote]);
       }
     });
     const arpPart = new Tone.Part((time, note) => {
@@ -612,57 +808,178 @@ class AudioEngine {
     arpPart.start(0);
     this._musicParts.push(arpPart);
 
-    // --- Beat (kick + hat) ---
-    const kick = new Tone.MembraneSynth({ volume: preset.beatVol }).connect(n.beatGain);
-    const hat = new Tone.NoiseSynth({
-      volume: preset.beatVol - 6,
-      envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 },
+    // --- Beat (kick + snare/clap + hat) ---
+    const kick = new Tone.MembraneSynth({
+      pitchDecay: preset.kickPitchDecay || 0.05,
+      octaves: preset.kickOctaves || 6,
+      envelope: { attack: 0.001, decay: preset.kickDecay || 0.3, sustain: 0, release: 0.1 },
+      volume: -4,
     }).connect(n.beatGain);
-    this._musicSynths.push(kick, hat);
 
-    const beatPart = new Tone.Part((time, type) => {
+    const snare = new Tone.NoiseSynth({
+      volume: -8,
+      noise: { type: 'white' },
+      envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.1 },
+    }).connect(n.beatGain);
+
+    const hat = new Tone.NoiseSynth({
+      volume: -10,
+      envelope: { attack: 0.001, decay: preset.hatDecay || 0.05, sustain: 0, release: 0.02 },
+    }).connect(n.beatGain);
+    this._musicSynths.push(kick, snare, hat);
+
+    // Build beat events from pattern config
+    const beatEvents = [];
+    const snarePositions = new Set(preset.snareOn || [4, 12]);
+
+    // Kick pattern
+    switch (preset.beatPattern) {
+      case 'four-on-floor':
+        [0, 4, 8, 12].forEach(pos => {
+          beatEvents.push([getSwungTime(pos, swing), 'k']);
+        });
+        break;
+      case 'breakbeat':
+        [0, 10].forEach(pos => {
+          beatEvents.push([getSwungTime(pos, swing), 'k']);
+        });
+        break;
+      case 'half-time':
+        [0, 8].forEach(pos => {
+          beatEvents.push([getSwungTime(pos, swing), 'k']);
+        });
+        break;
+    }
+
+    // Snare/clap
+    snarePositions.forEach(pos => {
+      beatEvents.push([getSwungTime(pos, swing), 's']);
+    });
+
+    // Hat pattern
+    switch (preset.hatStyle) {
+      case '16ths':
+        for (let i = 0; i < 16; i++) {
+          const vel = (i % 4 === 0) ? 1 : 0.5;
+          beatEvents.push([getSwungTime(i, swing), 'h', vel]);
+        }
+        break;
+      case 'offbeat-8ths':
+        [2, 6, 10, 14].forEach(pos => {
+          beatEvents.push([getSwungTime(pos, swing), 'h', 0.8]);
+        });
+        break;
+      case 'breakbeat':
+        for (let i = 0; i < 16; i += 2) {
+          beatEvents.push([getSwungTime(i, swing), 'h', 0.8]);
+        }
+        for (let i = 1; i < 16; i += 2) {
+          beatEvents.push([getSwungTime(i, swing), 'h', 0.3]);
+        }
+        break;
+      case 'sparse':
+        [4, 12].forEach(pos => {
+          beatEvents.push([getSwungTime(pos, swing), 'h', 0.7]);
+        });
+        break;
+    }
+
+    const beatPart = new Tone.Part((time, type, vel) => {
       if (type === 'k') kick.triggerAttackRelease('C1', '8n', time);
-      else hat.triggerAttackRelease('16n', time);
-    }, [
-      [0, 'k'], ['0:1', 'h'], ['0:2', 'k'], ['0:2:2', 'h'],
-      ['0:3', 'h'], ['0:3:2', 'h'],
-    ]);
+      else if (type === 's') snare.triggerAttackRelease('16n', time);
+      else {
+        hat.volume.rampTo(-10 - (1 - (vel || 0.5)) * 10, 0.001);
+        hat.triggerAttackRelease('16n', time);
+      }
+    }, beatEvents.map(e => ({ time: e[0], type: e[1], vel: e[2] })));
     beatPart.loop = true;
-    beatPart.loopEnd = '1m';
+    beatPart.loopEnd = Tone.Time('1m').toSeconds();
     beatPart.start(0);
     this._musicParts.push(beatPart);
 
-    // --- Walking bass for jazz ---
-    if (preset.walkingBass) {
-      const bassSynth = new Tone.Synth({
-        oscillator: { type: 'sine' },
-        envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 0.5 },
-        volume: -8,
-      }).connect(n.padGain);
-      this._musicSynths.push(bassSynth);
+    // --- Bass synth ---
+    // Create bass filter node for real-time control
+    const bassFilter = new Tone.Filter({
+      frequency: this._bassFilterCutoff || preset.bassFilterFreq || 400,
+      type: 'lowpass',
+      Q: this._bassFilterQ || preset.bassFilterQ || 1,
+    }).connect(n.bassGain);
+    n.bassFilter = bassFilter;
+    this._musicSynths.push(bassFilter);
 
-      const bassEvents = [];
+    let bassSynth;
+    let bassDest = bassFilter;
+
+    // Distortion on bass for hard techno
+    if (preset.distorted) {
+      const bassDist = new Tone.Distortion({ distortion: 0.6 }).connect(bassDest);
+      bassDest = bassDist;
+      this._musicSynths.push(bassDist);
+    }
+
+    if (preset.acid303) {
+      // Acid 303 bass
+      bassSynth = new Tone.MonoSynth({
+        oscillator: { type: 'sawtooth' },
+        filter: { type: 'lowpass', rolloff: -24, Q: preset.bassFilterQ || 12 },
+        filterEnvelope: {
+          attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.3,
+          baseFrequency: preset.bassFilterFreq || 300, octaves: 3.5,
+        },
+        envelope: { attack: 0.01, decay: 0.15, sustain: 0.2, release: 0.3 },
+        volume: -6,
+      }).connect(bassDest);
+    } else {
+      bassSynth = new Tone.MonoSynth({
+        oscillator: { type: preset.bassOsc || 'sine' },
+        filter: { type: 'lowpass', frequency: preset.bassFilterFreq || 400, Q: preset.bassFilterQ || 1 },
+        envelope: { attack: 0.02, decay: 0.3, sustain: 0.4, release: 0.5 },
+        volume: -6,
+      }).connect(bassDest);
+    }
+    this._musicSynths.push(bassSynth);
+
+    // Bass pattern from preset
+    const bassPattern = preset.bassPattern || [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0];
+    const bassEvents = [];
+    chordNames.forEach((chordName, ci) => {
+      const notes = CHORDS[chordName];
+      if (!notes) return;
+      const root = notes[0].replace(/[0-9]/g, '');
+      for (let s = 0; s < 16; s++) {
+        if (bassPattern[s]) {
+          const t = ci * barLen + getSwungTime(s, swing);
+          bassEvents.push([t, root + '2']);
+        }
+      }
+    });
+
+    // Walking bass variation: step through chord tones
+    if (preset.walkingBass) {
+      bassEvents.length = 0;
       chordNames.forEach((chordName, ci) => {
         const notes = CHORDS[chordName];
         if (!notes) return;
         for (let s = 0; s < 4; s++) {
           const note = notes[s % notes.length];
           const letter = note.replace(/[0-9]/g, '');
-          bassEvents.push([ci * barLen + s * stepLen * 2, letter + '2']);
+          bassEvents.push([ci * barLen + s * Tone.Time('4n').toSeconds(), letter + '2']);
         }
       });
-      const bassPart = new Tone.Part((time, note) => {
-        bassSynth.triggerAttackRelease(note, '4n', time);
-      }, bassEvents);
-      bassPart.loop = true;
-      bassPart.loopEnd = chordNames.length * barLen;
-      bassPart.start(0);
-      this._musicParts.push(bassPart);
     }
+
+    const bassPart = new Tone.Part((time, note) => {
+      bassSynth.triggerAttackRelease(note, '16n', time);
+    }, bassEvents);
+    bassPart.loop = true;
+    bassPart.loopEnd = chordNames.length * barLen;
+    bassPart.start(0);
+    this._musicParts.push(bassPart);
   }
 
   _stopMusic() {
     this._nodes.musicGain.gain.rampTo(0, RAMP);
+    this._nodes.bassGain.gain.rampTo(0, RAMP);
     this._teardownMusic();
   }
 
@@ -677,6 +994,11 @@ class AudioEngine {
   setMusicPreset(preset) {
     if (!MUSIC_PRESETS[preset]) return;
     this._musicPreset = preset;
+    const p = MUSIC_PRESETS[preset];
+    if (this.initialized) Tone.Transport.bpm.rampTo(p.bpm, 0.5);
+    this._swing = p.swing || 0;
+    this._bassFilterCutoff = p.bassFilterFreq || 400;
+    this._bassFilterQ = p.bassFilterQ || 1;
     if (this._musicEnabled && this.playing) this._startMusic();
   }
 
@@ -696,6 +1018,38 @@ class AudioEngine {
   setBeatVolume(v) {
     this._beatVolume = v;
     if (this.playing) this._nodes.beatGain.gain.rampTo(v, RAMP);
+  }
+
+  /** Set BPM directly (user control). @param {number} bpm */
+  setBPM(bpm) {
+    if (this.initialized) Tone.Transport.bpm.rampTo(bpm, 0.5);
+  }
+
+  /** @returns {number} Current BPM */
+  getBPM() {
+    return this.initialized ? Tone.Transport.bpm.value : 128;
+  }
+
+  /** Set swing amount (0-0.3). @param {number} amount */
+  setSwing(amount) {
+    this._swing = amount;
+    if (this._musicEnabled && this.playing) this._startMusic();
+  }
+
+  /** Set bass filter cutoff (200-5000 Hz). @param {number} freq */
+  setBassFilterCutoff(freq) {
+    this._bassFilterCutoff = freq;
+    if (this._nodes.bassFilter) {
+      this._nodes.bassFilter.frequency.rampTo(freq, RAMP);
+    }
+  }
+
+  /** Set bass filter resonance (0-20). @param {number} q */
+  setBassFilterResonance(q) {
+    this._bassFilterQ = q;
+    if (this._nodes.bassFilter) {
+      this._nodes.bassFilter.Q.rampTo(q, RAMP);
+    }
   }
 
   // ───────── MASTER ─────────
@@ -755,7 +1109,7 @@ class AudioEngine {
         this.setNatureType('rain');
         this.setNatureVolume(0.4);
         this.setNatureEnabled(true);
-        this.setMusicPreset('ambient');
+        this.setMusicPreset('ambienttechno');
         this.setPadVolume(0.2);
         this.setArpVolume(0.15);
         this.setBeatVolume(0);
@@ -768,7 +1122,7 @@ class AudioEngine {
         this.setNatureType('cafe');
         this.setNatureVolume(0.3);
         this.setNatureEnabled(true);
-        this.setMusicPreset('lofi');
+        this.setMusicPreset('deephouse');
         this.setPadVolume(0.25);
         this.setArpVolume(0.2);
         this.setBeatVolume(0.15);
@@ -788,7 +1142,7 @@ class AudioEngine {
         this.setBinauralFrequency(40);
         this.setBinauralVolume(0.4);
         this.setBinauralEnabled(true);
-        this.setMusicPreset('synthwave');
+        this.setMusicPreset('hardtechno');
         this.setPadVolume(0.4);
         this.setArpVolume(0.35);
         this.setBeatVolume(0.3);
