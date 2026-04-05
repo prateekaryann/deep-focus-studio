@@ -116,22 +116,24 @@ input, textarea, button, select {
    ------------------------------------------------------- */
 .screen {
   display: none;
+  min-height: 100vh;
   width: 100%;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 1.5rem;
+  position: relative;
+  z-index: 1;
 }
 .screen.active {
-  display: block;
+  display: flex;
 }
 
 /* -------------------------------------------------------
    5. Welcome / Intent Screen
    ------------------------------------------------------- */
 #screen-welcome {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
   min-height: 100vh;
-  padding: 2rem;
   animation: fadeIn 0.8s ease;
 }
 
@@ -173,9 +175,9 @@ input, textarea, button, select {
 }
 
 .preset-card {
-  background: var(--bg-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(12, 12, 18, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 1.25rem;
@@ -213,7 +215,8 @@ input, textarea, button, select {
   border-radius: 999px;
   font-size: 0.9rem;
   font-weight: 500;
-  background: var(--bg-tertiary);
+  background: rgba(12, 12, 18, 0.7);
+  backdrop-filter: blur(8px);
   color: var(--text-secondary);
   border: 1px solid var(--border);
   cursor: pointer;
@@ -251,9 +254,9 @@ input, textarea, button, select {
    6. Main Focus Screen
    ------------------------------------------------------- */
 #screen-focus {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 1.5rem;
+  justify-content: flex-start;
+  overflow-y: auto;
+  padding-top: 1rem;
   animation: fadeIn 0.5s ease;
 }
 
@@ -261,9 +264,11 @@ input, textarea, button, select {
 .nav-tabs {
   display: flex;
   gap: 0.25rem;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-sm);
-  padding: 4px;
+  background: rgba(12, 12, 18, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius-lg);
+  padding: 0.25rem;
   width: fit-content;
   margin: 0 auto 2rem;
 }
@@ -288,6 +293,9 @@ input, textarea, button, select {
 .timer-section {
   text-align: center;
   padding: 2rem 0;
+  background: rgba(12, 12, 18, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .timer-display {
@@ -356,10 +364,10 @@ input, textarea, button, select {
 }
 
 .audio-card {
-  background: var(--bg-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border);
+  background: rgba(12, 12, 18, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-lg);
   padding: 1.25rem;
   transition: border-color 0.3s ease;
@@ -562,7 +570,7 @@ input[type="range"]::-moz-range-track {
   display: flex;
   align-items: center;
   gap: 1.25rem;
-  background: var(--bg-glass);
+  background: rgba(12, 12, 18, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border);
@@ -800,15 +808,9 @@ input[type="range"]::-moz-range-track {
    11. Session Complete Screen
    ------------------------------------------------------- */
 #screen-complete {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-  min-height: 100vh;
-  padding: 2rem;
   text-align: center;
   animation: fadeIn 0.6s ease;
-  position: relative;
   overflow: hidden;
 }
 
@@ -898,9 +900,6 @@ input[type="range"]::-moz-range-track {
    12. Dashboard Screen
    ------------------------------------------------------- */
 #screen-dashboard {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 1.5rem;
   animation: fadeIn 0.5s ease;
 }
 
@@ -1180,7 +1179,8 @@ button:focus-visible,
 
 /* Welcome screen layout */
 .welcome-container {
-  max-width: 600px;
+  width: 100%;
+  max-width: 900px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
   display: flex;
@@ -1214,7 +1214,9 @@ button:focus-visible,
   align-items: flex-start;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
-  background: var(--bg-glass);
+  background: rgba(12, 12, 18, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   font-size: 0.85rem;
@@ -1273,7 +1275,8 @@ button:focus-visible,
 
 /* Focus screen layout */
 .focus-container {
-  max-width: 960px;
+  width: 100%;
+  max-width: 900px;
   margin: 0 auto;
   padding: 1.5rem;
 }
@@ -1441,12 +1444,18 @@ button:focus-visible,
 
 /* Session Complete screen */
 .complete-container {
-  max-width: 600px;
+  width: 100%;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 2rem 1.5rem;
+  padding: 2rem;
   display: flex;
   flex-direction: column;
   align-items: center;
+  background: rgba(12, 12, 18, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255,255,255,0.06);
 }
 
 .complete-header {
@@ -1513,9 +1522,15 @@ button:focus-visible,
 
 /* Dashboard screen */
 .dashboard-container {
-  max-width: 960px;
+  width: 100%;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 2rem;
+  background: rgba(12, 12, 18, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255,255,255,0.06);
 }
 
 .dashboard-title {

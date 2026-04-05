@@ -358,6 +358,7 @@
         if (matchingMood) matchingMood.classList.add('active');
         if (audioEngine) {
           audioEngine.setMusicPreset(btn.dataset.preset);
+          if (vizBG && vizBG.setGenre) vizBG.setGenre(btn.dataset.preset);
           // Sync BPM and swing sliders to the new preset
           const bpm = audioEngine.getBPM();
           const bpmSlider = document.getElementById('bpm-slider');
@@ -382,6 +383,7 @@
         // Apply preset
         if (audioEngine) {
           audioEngine.setMusicPreset(btn.dataset.preset);
+          if (vizBG && vizBG.setGenre) vizBG.setGenre(btn.dataset.preset);
           // Sync BPM slider
           const bpm = audioEngine.getBPM();
           const bpmSlider = document.getElementById('bpm-slider');
@@ -543,6 +545,7 @@
       else if (freq < 12) vizBG.setTheme('alpha');
       else if (freq < 30) vizBG.setTheme('beta');
       else vizBG.setTheme('gamma');
+      if (vizBG.setGenre) vizBG.setGenre(audioEngine?._musicPreset || 'minimal');
     }
   }
 
@@ -569,6 +572,13 @@
   }
 
   function updateVisualizer() {
+    // Always update background visualizer (ambient mode when no audio)
+    if (vizBG) {
+      vizBG.update(
+        audioEngine && audioEngine.playing ? audioEngine.getFrequencyData() : null,
+        audioEngine && audioEngine.playing ? audioEngine.getWaveformData() : null
+      );
+    }
     if (!audioEngine || !audioEngine.playing) {
       vizBars.forEach(bar => { bar.style.height = '4px'; });
       vizAnimFrame = requestAnimationFrame(updateVisualizer);
@@ -581,12 +591,6 @@
         const val = (data[idx] + 140) / 140; // FFT dB normalize
         bar.style.height = Math.max(4, val * 50) + 'px';
       });
-    }
-    if (vizBG) {
-      vizBG.update(
-        audioEngine ? audioEngine.getFrequencyData() : null,
-        audioEngine ? audioEngine.getWaveformData() : null
-      );
     }
     vizAnimFrame = requestAnimationFrame(updateVisualizer);
   }
