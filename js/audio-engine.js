@@ -195,6 +195,41 @@ const MUSIC_PRESETS = {
   },
 };
 
+/** All note names for transposition */
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const ENHARMONIC = { 'Db': 'C#', 'Eb': 'D#', 'Fb': 'E', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#', 'Cb': 'B' };
+
+/** Transpose a single note string like "C#3" by semitones */
+function transposeNote(note, semitones) {
+  if (!semitones) return note;
+  const match = note.match(/^([A-G][b#]?)(\d+)$/);
+  if (!match) return note;
+  let noteName = match[1];
+  let octave = parseInt(match[2]);
+  if (ENHARMONIC[noteName]) noteName = ENHARMONIC[noteName];
+  let idx = NOTE_NAMES.indexOf(noteName);
+  if (idx === -1) return note;
+  idx += semitones;
+  while (idx < 0) { idx += 12; octave--; }
+  while (idx >= 12) { idx -= 12; octave++; }
+  return NOTE_NAMES[idx] + octave;
+}
+
+/** Transpose an array of note strings */
+function transposeNotes(notes, semitones) {
+  if (!semitones || !notes) return notes;
+  return notes.map(n => transposeNote(n, semitones));
+}
+
+/** Chord progression templates (relative to key) — returns chord names */
+const PROGRESSION_TEMPLATES = {
+  'i-iv-v-i':       ['Am', 'Dm', 'Em', 'Am'],       // dark minor
+  'I-V-vi-IV':      ['C', 'G', 'Am', 'Fmaj7'],      // pop
+  'ii-V-I':         ['Dm7', 'G7', 'Cmaj7', 'Cmaj7'], // jazz
+  'i-VI-III-VII':   ['Am', 'Fmaj7', 'C', 'G'],       // euphoric
+  'i-i-i-i':        ['Am', 'Am', 'Am', 'Am'],         // hypnotic
+};
+
 class AudioEngine {
   constructor() {
     /** @type {boolean} */
@@ -235,6 +270,15 @@ class AudioEngine {
     this._density = 0.7;         // 0-1, note trigger probability multiplier
     this._padAttack = 0.5;       // 0-1, pad envelope attack (maps to 0.01-5s)
     this._arpPattern = 'up';     // up, down, up-down, random
+
+    // Key & progression
+    this._keyTranspose = 0;       // semitones from C (0-11)
+    this._progressionType = 'default'; // which chord progression to use
+
+    // Melody
+    this._melodyEnabled = false;
+    this._melodyVolume = 0.4;
+    this._melodyStyle = 'generative'; // generative, call-response, ambient
 
     // Audio nodes (created in init)
     this._nodes = {};
@@ -641,6 +685,7 @@ class AudioEngine {
     n.padGain = new Tone.Gain(0).connect(n.musicGain);
     n.beatGain = new Tone.Gain(0).connect(n.musicGain);
     n.bassGain = new Tone.Gain(0).connect(n.musicGain);
+    n.melodyGain = new Tone.Gain(0).connect(n.musicGain);
     this._musicParts = [];
     this._musicSynths = [];
   }
@@ -702,6 +747,21 @@ class AudioEngine {
     return presetDefault * (this._delayMix / 0.4);
   }
 
+  /** Get chord notes with key transposition applied */
+  _getChordNotes(chordName) {
+    const notes = CHORDS[chordName];
+    if (!notes) return null;
+    return transposeNotes(notes, this._keyTranspose);
+  }
+
+  /** Get the effective chord progression (override or preset default) */
+  _getChords(preset) {
+    if (this._progressionType !== 'default' && PROGRESSION_TEMPLATES[this._progressionType]) {
+      return PROGRESSION_TEMPLATES[this._progressionType];
+    }
+    return preset.chords;
+  }
+
   /** Get arp notes from chord in the selected pattern */
   _getArpNotes(chordNotes, octave) {
     if (!chordNotes) return [];
@@ -761,6 +821,7 @@ class AudioEngine {
     n.padGain.gain.rampTo(this._padVolume, RAMP);
     n.beatGain.gain.rampTo(this._beatVolume, RAMP);
     n.bassGain.gain.rampTo(this._padVolume * 0.8, RAMP);
+    n.melodyGain.gain.rampTo(this._melodyEnabled ? this._melodyVolume : 0, RAMP);
     n.musicGain.gain.rampTo(1, RAMP);
 
     // Each genre has its own builder for distinct sound
@@ -778,14 +839,101 @@ class AudioEngine {
       default: this._buildGeneric(preset); break;
     }
 
+    // Build melody layer if enabled
+    if (this._melodyEnabled) {
+      this._buildMelody(preset);
+    }
+
     this._postProcessMusic();
+  }
+
+  /** Build a melody layer over the current chord progression */
+  _buildMelody(preset) {
+    const n = this._nodes;
+    const chordNames = this._getChords(preset);
+    const barLen = Tone.Time('1m').toSeconds();
+
+    try {
+      const melodyReverb = new Tone.Reverb({ decay: 4, wet: 0.4 }).connect(n.melodyGain);
+      this._trackReverb(melodyReverb);
+      this._musicSynths.push(melodyReverb);
+
+      const melodyDelay = new Tone.PingPongDelay({
+        delayTime: '8n.', feedback: 0.3, wet: 0.25,
+      }).connect(melodyReverb);
+      this._trackDelay(melodyDelay);
+      this._musicSynths.push(melodyDelay);
+
+      const melodySynth = new Tone.Synth({
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1.5 },
+        volume: -6,
+      }).connect(melodyDelay);
+      this._musicSynths.push(melodySynth);
+
+      const style = this._melodyStyle;
+      const melodyEvents = [];
+
+      chordNames.forEach((chordName, ci) => {
+        const chordNotes = this._getChordNotes(chordName);
+        if (!chordNotes) return;
+        // Build scale from chord tones + passing tones in octave 5
+        const scaleNotes = chordNotes.map(note => {
+          const letter = note.replace(/[0-9]/g, '');
+          return letter + '5';
+        });
+        // Add a passing tone between chord tones
+        const extendedScale = [...scaleNotes];
+        if (chordNotes.length >= 2) {
+          const letter = chordNotes[1].replace(/[0-9]/g, '');
+          extendedScale.push(transposeNote(letter + '5', 2)); // whole step above 2nd
+        }
+
+        if (style === 'generative') {
+          // Probabilistic melody: 8th note grid, ~50% density
+          for (let s = 0; s < 8; s++) {
+            const time = ci * barLen + s * Tone.Time('8n').toSeconds();
+            const note = extendedScale[Math.floor(Math.random() * extendedScale.length)];
+            melodyEvents.push([time, { note, prob: 0.5, dur: '8n' }]);
+          }
+        } else if (style === 'call-response') {
+          // First half: short phrase, second half: response
+          const callLen = 3;
+          for (let s = 0; s < callLen; s++) {
+            const time = ci * barLen + s * Tone.Time('8n').toSeconds();
+            const note = extendedScale[s % extendedScale.length];
+            melodyEvents.push([time, { note, prob: 0.8, dur: '8n' }]);
+          }
+          // Response after a rest
+          for (let s = 0; s < 2; s++) {
+            const time = ci * barLen + (5 + s) * Tone.Time('8n').toSeconds();
+            const note = extendedScale[(callLen - 1 - s) % extendedScale.length];
+            melodyEvents.push([time, { note, prob: 0.7, dur: '4n' }]);
+          }
+        } else {
+          // Ambient: very sparse, long notes
+          const note = extendedScale[Math.floor(Math.random() * extendedScale.length)];
+          melodyEvents.push([ci * barLen, { note, prob: 0.4, dur: '2n' }]);
+        }
+      });
+
+      const melodyPart = new Tone.Part((time, ev) => {
+        if (this._prob(ev.prob)) {
+          melodySynth.triggerAttackRelease(ev.note, ev.dur, time, this._randVel(0.5, 0.15));
+        }
+      }, melodyEvents);
+      melodyPart.loop = true;
+      melodyPart.loopEnd = chordNames.length * barLen;
+      melodyPart.start(0);
+      this._musicParts.push(melodyPart);
+    } catch (_) {}
   }
 
   // ── Genre-specific builders ──
 
   _buildMinimal(preset) {
     const n = this._nodes;
-    const chordNames = preset.chords;
+    const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
 
     // Pad: FMSynth - metallic/bell tones
@@ -809,7 +957,7 @@ class AudioEngine {
       this._musicSynths.push(padSynth);
 
       const padPart = new Tone.Part((time, chord) => {
-        const notes = CHORDS[chord];
+        const notes = this._getChordNotes(chord);
         if (!notes || !this._prob(0.7)) return;
         padSynth.triggerAttackRelease(notes, '1m', time, this._randVel(0.4, 0.15));
       }, chordNames.map((c, i) => [i * barLen, c]));
@@ -835,7 +983,7 @@ class AudioEngine {
       // Sparse: only 4 notes per bar
       const arpEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         const arpNotes = this._getArpNotes(notes, 5);
         for (let s = 0; s < 4; s++) {
@@ -900,7 +1048,7 @@ class AudioEngine {
 
   _buildDetroit(preset) {
     const n = this._nodes;
-    const chordNames = preset.chords;
+    const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
     const swing = this._swing || preset.swing || 0;
 
@@ -925,7 +1073,7 @@ class AudioEngine {
       this._musicSynths.push(padSynth);
 
       const padPart = new Tone.Part((time, chord) => {
-        const notes = CHORDS[chord];
+        const notes = this._getChordNotes(chord);
         if (!notes) return;
         padSynth.triggerAttackRelease(notes, '1m', time, this._randVel(0.5, 0.1));
       }, chordNames.map((c, i) => [i * barLen, c]));
@@ -950,7 +1098,7 @@ class AudioEngine {
 
       const arpEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         const up = [...notes];
         const down = [...notes].reverse().slice(1, -1);
@@ -1037,7 +1185,7 @@ class AudioEngine {
 
       const bassEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         const bassPattern = preset.bassPattern || [1,0,1,0, 0,0,1,0, 1,0,0,1, 0,0,1,0];
         for (let s = 0; s < 16; s++) {
@@ -1059,7 +1207,7 @@ class AudioEngine {
 
   _buildAcid(preset) {
     const n = this._nodes;
-    const chordNames = preset.chords;
+    const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
 
     // No pad for acid - it's all about the bass
@@ -1133,7 +1281,7 @@ class AudioEngine {
 
       const bassEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         const root = notes[0].replace(/[0-9]/g, '');
         for (let s = 0; s < 16; s++) {
@@ -1183,7 +1331,7 @@ class AudioEngine {
 
   _buildDubTechno(preset) {
     const n = this._nodes;
-    const chordNames = preset.chords;
+    const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
 
     // Pad: Sawtooth → MASSIVE Reverb(10s) → FeedbackDelay
@@ -1210,7 +1358,7 @@ class AudioEngine {
       // Sparse: chord stab every 2 bars
       const padEvents = chordNames.filter((_, i) => i % 2 === 0).map((c, i) => [i * 2 * barLen, c]);
       const padPart = new Tone.Part((time, chord) => {
-        const notes = CHORDS[chord];
+        const notes = this._getChordNotes(chord);
         if (!notes) return;
         padSynth.triggerAttackRelease(notes, '2m', time, this._randVel(0.35, 0.1));
       }, padEvents);
@@ -1237,7 +1385,7 @@ class AudioEngine {
 
       const arpEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         // Very sparse: 2 notes per bar
         for (let s = 0; s < 2; s++) {
@@ -1308,7 +1456,7 @@ class AudioEngine {
 
       const bassEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         const root = notes[0].replace(/[0-9]/g, '');
         bassEvents.push([ci * barLen, root + '2']);
@@ -1325,7 +1473,7 @@ class AudioEngine {
 
   _buildTrance(preset) {
     const n = this._nodes;
-    const chordNames = preset.chords;
+    const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
 
     // Pad: SUPERSAW - 5 detuned sawtooths → Chorus → Reverb
@@ -1351,7 +1499,7 @@ class AudioEngine {
         this._musicSynths.push(synth);
 
         const padPart = new Tone.Part((time, chord) => {
-          const notes = CHORDS[chord];
+          const notes = this._getChordNotes(chord);
           if (!notes) return;
           synth.triggerAttackRelease(notes, '1m', time);
         }, chordNames.map((c, i) => [i * barLen, c]));
@@ -1377,7 +1525,7 @@ class AudioEngine {
 
       const arpEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         for (let s = 0; s < 16; s++) {
           const note = notes[s % notes.length];
@@ -1450,7 +1598,7 @@ class AudioEngine {
 
       const bassEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         const root = notes[0].replace(/[0-9]/g, '');
         for (let s = 0; s < 8; s++) {
@@ -1479,7 +1627,7 @@ class AudioEngine {
 
   _buildDnB(preset) {
     const n = this._nodes;
-    const chordNames = preset.chords;
+    const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
     const swing = this._swing || preset.swing || 0.1;
 
@@ -1506,7 +1654,7 @@ class AudioEngine {
       this._musicSynths.push(padSynth);
 
       const padPart = new Tone.Part((time, chord) => {
-        const notes = CHORDS[chord];
+        const notes = this._getChordNotes(chord);
         if (!notes) return;
         padSynth.triggerAttackRelease(notes, '1m', time, this._randVel(0.4, 0.1));
       }, chordNames.map((c, i) => [i * barLen, c]));
@@ -1530,7 +1678,7 @@ class AudioEngine {
 
       const arpEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         const up = [...notes];
         const down = [...notes].reverse().slice(1, -1);
@@ -1623,7 +1771,7 @@ class AudioEngine {
       const bassEvents = [];
       const bassPattern = preset.bassPattern || [1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,1];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         const root = notes[0].replace(/[0-9]/g, '');
         for (let s = 0; s < 16; s++) {
@@ -1645,7 +1793,7 @@ class AudioEngine {
 
   _buildDeepHouse(preset) {
     const n = this._nodes;
-    const chordNames = preset.chords;
+    const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
     const swing = this._swing || preset.swing || 0.15;
 
@@ -1680,7 +1828,7 @@ class AudioEngine {
         });
       });
       const padPart = new Tone.Part((time, chord) => {
-        const notes = CHORDS[chord];
+        const notes = this._getChordNotes(chord);
         if (!notes) return;
         if (this._prob(0.85)) {
           padSynth.triggerAttackRelease(notes, '8n', time, this._randVel(0.45, 0.15));
@@ -1710,7 +1858,7 @@ class AudioEngine {
 
       const stabEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         // Offbeat stabs
         [2, 6, 10, 14].forEach(pos => {
@@ -1718,7 +1866,7 @@ class AudioEngine {
         });
       });
       const stabPart = new Tone.Part((time, chord) => {
-        const notes = CHORDS[chord];
+        const notes = this._getChordNotes(chord);
         if (!notes) return;
         if (this._prob(0.8)) {
           stabSynth.triggerAttackRelease(notes, '32n', time, this._randVel(0.5, 0.2));
@@ -1788,7 +1936,7 @@ class AudioEngine {
       // Walking bass: step through chord tones
       const bassEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         for (let s = 0; s < 4; s++) {
           const note = notes[s % notes.length];
@@ -1808,7 +1956,7 @@ class AudioEngine {
 
   _buildProgressive(preset) {
     const n = this._nodes;
-    const chordNames = preset.chords;
+    const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
 
     // Pad: Sawtooth → AutoFilter (slow sweep) → Reverb
@@ -1835,7 +1983,7 @@ class AudioEngine {
       this._musicSynths.push(padSynth);
 
       const padPart = new Tone.Part((time, chord) => {
-        const notes = CHORDS[chord];
+        const notes = this._getChordNotes(chord);
         if (!notes) return;
         padSynth.triggerAttackRelease(notes, '1m', time, this._randVel(0.4, 0.1));
       }, chordNames.map((c, i) => [i * barLen, c]));
@@ -1861,7 +2009,7 @@ class AudioEngine {
 
       const arpEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         for (let s = 0; s < 8; s++) {
           const note = notes[s % notes.length];
@@ -1937,7 +2085,7 @@ class AudioEngine {
       const bassEvents = [];
       const bassPattern = preset.bassPattern || [1,0,1,0, 0,1,0,0, 1,0,0,1, 0,1,0,0];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         const root = notes[0].replace(/[0-9]/g, '');
         for (let s = 0; s < 16; s++) {
@@ -1971,7 +2119,7 @@ class AudioEngine {
 
   _buildAmbientTechno(preset) {
     const n = this._nodes;
-    const chordNames = preset.chords;
+    const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
 
     // Pad: AMSynth with slow modulation → massive reverb → delay. Almost no dry signal.
@@ -1998,7 +2146,7 @@ class AudioEngine {
       this._musicSynths.push(padSynth);
 
       const padPart = new Tone.Part((time, chord) => {
-        const notes = CHORDS[chord];
+        const notes = this._getChordNotes(chord);
         if (!notes) return;
         padSynth.triggerAttackRelease(notes, '2m', time, this._randVel(0.3, 0.1));
       }, chordNames.map((c, i) => [i * barLen, c]));
@@ -2031,7 +2179,7 @@ class AudioEngine {
       // Very sparse: random bell tones every 3-8 seconds
       const arpLoop = new Tone.Loop((time) => {
         const chordName = chordNames[Math.floor(Math.random() * chordNames.length)];
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         const note = notes[Math.floor(Math.random() * notes.length)];
         const letter = note.replace(/[0-9]/g, '');
@@ -2083,7 +2231,7 @@ class AudioEngine {
 
       const bassEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         const root = notes[0].replace(/[0-9]/g, '');
         bassEvents.push([ci * barLen, root + '2']);
@@ -2100,7 +2248,7 @@ class AudioEngine {
 
   _buildHardTechno(preset) {
     const n = this._nodes;
-    const chordNames = preset.chords;
+    const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
 
     // Pad: Square wave → Distortion → Chebyshev for harsh metallic grit
@@ -2123,7 +2271,7 @@ class AudioEngine {
       this._musicSynths.push(padSynth);
 
       const padPart = new Tone.Part((time, chord) => {
-        const notes = CHORDS[chord];
+        const notes = this._getChordNotes(chord);
         if (!notes) return;
         padSynth.triggerAttackRelease(notes, '1m', time, 0.5);
       }, chordNames.map((c, i) => [i * barLen, c]));
@@ -2147,7 +2295,7 @@ class AudioEngine {
 
       const arpEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         for (let s = 0; s < 16; s++) {
           const note = notes[s % notes.length];
@@ -2229,7 +2377,7 @@ class AudioEngine {
       const bassEvents = [];
       const bassPattern = preset.bassPattern || [1,1,0,1, 1,0,1,1, 0,1,1,0, 1,1,0,1];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         const root = notes[0].replace(/[0-9]/g, '');
         for (let s = 0; s < 16; s++) {
@@ -2251,7 +2399,7 @@ class AudioEngine {
   /** Fallback generic builder for unknown presets */
   _buildGeneric(preset) {
     const n = this._nodes;
-    const chordNames = preset.chords;
+    const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
     const swing = this._swing || preset.swing || 0;
 
@@ -2275,7 +2423,7 @@ class AudioEngine {
       this._musicSynths.push(padSynth);
 
       const padPart = new Tone.Part((time, chord) => {
-        const notes = CHORDS[chord];
+        const notes = this._getChordNotes(chord);
         if (!notes) return;
         padSynth.triggerAttackRelease(notes, '1m', time);
       }, chordNames.map((c, i) => [i * barLen, c]));
@@ -2302,7 +2450,7 @@ class AudioEngine {
 
       const arpEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         for (let s = 0; s < 8; s++) {
           const note = notes[s % notes.length];
@@ -2371,7 +2519,7 @@ class AudioEngine {
 
       const bassEvents = [];
       chordNames.forEach((chordName, ci) => {
-        const notes = CHORDS[chordName];
+        const notes = this._getChordNotes(chordName);
         if (!notes) return;
         const root = notes[0].replace(/[0-9]/g, '');
         bassEvents.push([ci * barLen, root + '2']);
@@ -2493,6 +2641,36 @@ class AudioEngine {
   /** Set arp pattern. @param {string} pattern - up, down, up-down, random */
   setArpPattern(pattern) {
     this._arpPattern = pattern;
+    if (this._musicEnabled && this.playing) this._startMusic();
+  }
+
+  /** @param {number} semitones 0-11 */
+  setKeyTranspose(semitones) {
+    this._keyTranspose = semitones;
+    if (this._musicEnabled && this.playing) this._startMusic();
+  }
+
+  /** @param {string} type progression template name or 'default' */
+  setProgression(type) {
+    this._progressionType = type;
+    if (this._musicEnabled && this.playing) this._startMusic();
+  }
+
+  /** @param {boolean} enabled */
+  setMelodyEnabled(enabled) {
+    this._melodyEnabled = enabled;
+    if (this._musicEnabled && this.playing) this._startMusic();
+  }
+
+  /** @param {number} v 0-1 */
+  setMelodyVolume(v) {
+    this._melodyVolume = v;
+    if (this._nodes.melodyGain) this._nodes.melodyGain.gain.rampTo(v, RAMP);
+  }
+
+  /** @param {string} style generative, call-response, ambient */
+  setMelodyStyle(style) {
+    this._melodyStyle = style;
     if (this._musicEnabled && this.playing) this._startMusic();
   }
 

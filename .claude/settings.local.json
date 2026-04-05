@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -c js/audio-engine.js)",
+      "Bash(node -c js/app.js)"
+    ]
+  }
+}

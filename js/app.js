@@ -444,13 +444,13 @@
     });
 
     // Reverb mix
-    wireSlider('reverb-mix', v => {
+    wireSlider('reverb-slider', v => {
       if (audioEngine) audioEngine.setReverbMix(v / 100);
       saveAudioSetting('reverbMix', v);
     });
 
     // Delay mix
-    wireSlider('delay-mix', v => {
+    wireSlider('delay-slider', v => {
       if (audioEngine) audioEngine.setDelayMix(v / 100);
       saveAudioSetting('delayMix', v);
     });
@@ -462,19 +462,65 @@
     });
 
     // Pad Attack
-    wireSlider('pad-attack', v => {
+    wireSlider('pad-attack-slider', v => {
       if (audioEngine) audioEngine.setPadAttack(v / 100);
       saveAudioSetting('padAttack', v);
     });
 
     // Arp pattern buttons
-    document.querySelectorAll('.arp-btn').forEach(btn => {
+    document.querySelectorAll('.arp-pattern-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.arp-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.arp-pattern-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         const pattern = btn.dataset.pattern;
         if (audioEngine) audioEngine.setArpPattern(pattern);
         saveAudioSetting('arpPattern', pattern);
+      });
+    });
+
+    // Key select
+    const keySelect = document.getElementById('key-select');
+    if (keySelect) {
+      keySelect.addEventListener('change', () => {
+        if (audioEngine) audioEngine.setKeyTranspose(parseInt(keySelect.value));
+        saveAudioSetting('keyTranspose', keySelect.value);
+      });
+    }
+
+    // Progression select
+    const progSelect = document.getElementById('progression-select');
+    if (progSelect) {
+      progSelect.addEventListener('change', () => {
+        if (audioEngine) audioEngine.setProgression(progSelect.value);
+        saveAudioSetting('progression', progSelect.value);
+      });
+    }
+
+    // Melody toggle
+    const melodyToggle = document.getElementById('melody-toggle');
+    if (melodyToggle) {
+      melodyToggle.addEventListener('click', () => {
+        melodyToggle.classList.toggle('active');
+        const enabled = melodyToggle.classList.contains('active');
+        if (audioEngine) audioEngine.setMelodyEnabled(enabled);
+        saveAudioSetting('melodyEnabled', enabled);
+      });
+    }
+
+    // Melody volume
+    wireSlider('melody-vol', v => {
+      if (audioEngine) audioEngine.setMelodyVolume(v / 100);
+      saveAudioSetting('melodyVol', v);
+    });
+
+    // Melody style buttons
+    document.querySelectorAll('.melody-style-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.melody-style-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const style = btn.dataset.style;
+        if (audioEngine) audioEngine.setMelodyStyle(style);
+        saveAudioSetting('melodyStyle', style);
       });
     });
 
@@ -631,10 +677,11 @@
       ['swing', 'swing-slider', v => audioEngine.setSwing(v / 100)],
       ['bassCutoff', 'bass-cutoff', v => audioEngine.setBassFilterCutoff(v)],
       ['bassReso', 'bass-reso', v => audioEngine.setBassFilterResonance(parseFloat(v))],
-      ['reverbMix', 'reverb-mix', v => audioEngine.setReverbMix(v / 100)],
-      ['delayMix', 'delay-mix', v => audioEngine.setDelayMix(v / 100)],
+      ['reverbMix', 'reverb-slider', v => audioEngine.setReverbMix(v / 100)],
+      ['delayMix', 'delay-slider', v => audioEngine.setDelayMix(v / 100)],
       ['density', 'density-slider', v => audioEngine.setDensity(v / 100)],
-      ['padAttack', 'pad-attack', v => audioEngine.setPadAttack(v / 100)],
+      ['padAttack', 'pad-attack-slider', v => audioEngine.setPadAttack(v / 100)],
+      ['melodyVol', 'melody-vol', v => audioEngine.setMelodyVolume(v / 100)],
     ];
 
     mappings.forEach(([key, sliderId, fn]) => {
@@ -654,6 +701,35 @@
       audioEngine.setArpPattern(savedArpPattern);
       document.querySelectorAll('.arp-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.pattern === savedArpPattern);
+      });
+    }
+
+    // Restore key & progression
+    const savedKey = sessionManager.getSetting('audio_keyTranspose', null);
+    if (savedKey !== null) {
+      audioEngine.setKeyTranspose(parseInt(savedKey));
+      const keyEl = document.getElementById('key-select');
+      if (keyEl) keyEl.value = savedKey;
+    }
+    const savedProg = sessionManager.getSetting('audio_progression', null);
+    if (savedProg) {
+      audioEngine.setProgression(savedProg);
+      const progEl = document.getElementById('progression-select');
+      if (progEl) progEl.value = savedProg;
+    }
+
+    // Restore melody
+    const savedMelodyEnabled = sessionManager.getSetting('audio_melodyEnabled', null);
+    if (savedMelodyEnabled === true || savedMelodyEnabled === 'true') {
+      audioEngine.setMelodyEnabled(true);
+      const mt = document.getElementById('melody-toggle');
+      if (mt) mt.classList.add('active');
+    }
+    const savedMelodyStyle = sessionManager.getSetting('audio_melodyStyle', null);
+    if (savedMelodyStyle) {
+      audioEngine.setMelodyStyle(savedMelodyStyle);
+      document.querySelectorAll('.melody-style-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.style === savedMelodyStyle);
       });
     }
 
