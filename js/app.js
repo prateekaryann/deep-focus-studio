@@ -699,7 +699,7 @@
     const savedArpPattern = sessionManager.getSetting('audio_arpPattern', null);
     if (savedArpPattern) {
       audioEngine.setArpPattern(savedArpPattern);
-      document.querySelectorAll('.arp-btn').forEach(b => {
+      document.querySelectorAll('.arp-pattern-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.pattern === savedArpPattern);
       });
     }

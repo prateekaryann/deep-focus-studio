@@ -173,12 +173,20 @@
       </div>
       <div class="panel-body">
 
-        <!-- STEP 1: Pick a mood (primary interaction) -->
-        <div class="panel-section">
-          <div class="toggle-row">
-            <h4 class="panel-section-title" style="margin:0">Music</h4>
+        <!-- ═══════════════════════════════════════════════
+             LAYER 1: MUSIC (Full-spectrum, primary audio)
+             Based on research: this is the main audio layer.
+             Binaural modulation should be embedded here,
+             NOT played as a separate track over music.
+             ═══════════════════════════════════════════════ -->
+        <div class="panel-layer">
+          <div class="layer-header">
+            <div class="layer-badge layer-badge-music">1</div>
+            <h4 class="layer-title">Music</h4>
+            <span class="layer-hint">Primary focus audio</span>
             <button class="toggle-switch" id="music-toggle"></button>
           </div>
+
           <div class="mood-grid mood-grid-panel">
             <button class="mood-btn active" data-preset="minimal" data-mood="focused">
               <span class="mood-emoji">&#x1F3AF;</span>
@@ -213,6 +221,7 @@
               <span class="mood-name">Intense</span>
             </button>
           </div>
+
           <div class="regen-row">
             <button class="btn-regen" id="btn-regenerate" title="New variation">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -234,49 +243,44 @@
               </div>
             </details>
           </div>
+
+          <details class="genre-details panel-section-collapsible" open>
+            <summary class="genre-summary">Mix levels</summary>
+            <div class="mix-sliders">
+              <div class="slider-group"><div class="slider-label"><span>Arpeggio</span><span class="slider-value" id="arp-vol-val">35</span></div><input type="range" id="arp-vol" min="0" max="100" value="35"></div>
+              <div class="slider-group"><div class="slider-label"><span>Pad</span><span class="slider-value" id="pad-vol-val">40</span></div><input type="range" id="pad-vol" min="0" max="100" value="40"></div>
+              <div class="slider-group"><div class="slider-label"><span>Drums</span><span class="slider-value" id="beat-vol-val">50</span></div><input type="range" id="beat-vol" min="0" max="100" value="50"></div>
+              <div class="slider-group"><div class="slider-label"><span>Bass</span><span class="slider-value" id="bass-vol-val">50</span></div><input type="range" id="bass-vol" min="0" max="100" value="50"></div>
+            </div>
+          </details>
+
+          <details class="genre-details panel-section-collapsible">
+            <summary class="genre-summary">Advanced</summary>
+            <div class="slider-group"><div class="slider-label"><span>BPM</span><span class="slider-value" id="bpm-val">128</span></div><input type="range" id="bpm-slider" min="70" max="180" value="128"></div>
+            <div class="slider-group"><div class="slider-label"><span>Swing</span><span class="slider-value" id="swing-val">0</span></div><input type="range" id="swing-slider" min="0" max="30" value="0"></div>
+            <div class="slider-group"><div class="slider-label"><span>Bass Filter</span><span class="slider-value" id="bass-cutoff-val">400</span></div><input type="range" id="bass-cutoff" min="100" max="5000" value="400"></div>
+            <div class="slider-group"><div class="slider-label"><span>Resonance</span><span class="slider-value" id="bass-reso-val">1</span></div><input type="range" id="bass-reso" min="0" max="20" value="1" step="0.5"></div>
+          </details>
         </div>
 
-        <!-- STEP 2: Quick mix (4 sliders) -->
-        <details class="genre-details panel-section-collapsible" open>
-          <summary class="genre-summary">Mix</summary>
-          <div class="mix-sliders">
-            <div class="slider-group"><div class="slider-label"><span>Arpeggio</span><span class="slider-value" id="arp-vol-val">35</span></div><input type="range" id="arp-vol" min="0" max="100" value="35"></div>
-            <div class="slider-group"><div class="slider-label"><span>Pad</span><span class="slider-value" id="pad-vol-val">40</span></div><input type="range" id="pad-vol" min="0" max="100" value="40"></div>
-            <div class="slider-group"><div class="slider-label"><span>Drums</span><span class="slider-value" id="beat-vol-val">50</span></div><input type="range" id="beat-vol" min="0" max="100" value="50"></div>
-            <div class="slider-group"><div class="slider-label"><span>Bass</span><span class="slider-value" id="bass-vol-val">50</span></div><input type="range" id="bass-vol" min="0" max="100" value="50"></div>
+        <!-- ═══════════════════════════════════════════════
+             LAYER 2: SOUNDSCAPE (Low-mid freq, masks distractions)
+             Research: Nature/noise sounds mask environmental
+             distractions. Should NOT compete with music in
+             frequency range. Use only when music is quiet or off.
+             ═══════════════════════════════════════════════ -->
+        <div class="panel-layer">
+          <div class="layer-header">
+            <div class="layer-badge layer-badge-ambient">2</div>
+            <h4 class="layer-title">Soundscape</h4>
+            <span class="layer-hint">Mask distractions</span>
           </div>
-        </details>
 
-        <!-- STEP 3: Ambience - simplified -->
-        <div class="panel-section">
-          <h4 class="panel-section-title">Ambience</h4>
-          <div class="ambience-toggles">
-            <div class="toggle-row">
-              <span>Binaural Beats</span>
-              <button class="toggle-switch active" id="binaural-toggle"></button>
-            </div>
-            <div class="brain-states brain-states-compact">
-              <button class="state-btn" data-freq="6"><span class="freq">&theta; 6Hz</span></button>
-              <button class="state-btn active" data-freq="10"><span class="freq">&alpha; 10Hz</span></button>
-              <button class="state-btn" data-freq="18"><span class="freq">&beta; 18Hz</span></button>
-              <button class="state-btn" data-freq="40"><span class="freq">&gamma; 40Hz</span></button>
-            </div>
-            <div class="slider-group"><div class="slider-label"><span>Volume</span><span class="slider-value" id="binaural-vol-val">30</span></div><input type="range" id="binaural-vol" min="0" max="100" value="30"></div>
-          </div>
+          <p class="layer-note">Best used alone or at low volume under music. High volumes will muddy the mix.</p>
 
           <div class="ambience-toggles">
             <div class="toggle-row">
-              <span>Background noise</span>
-              <button class="toggle-switch active" id="noise-toggle"></button>
-            </div>
-            <div class="slider-group"><div class="slider-label"><span>Brown</span><span class="slider-value" id="brown-vol-val">40</span></div><input type="range" id="brown-vol" min="0" max="100" value="40"></div>
-            <div class="slider-group"><div class="slider-label"><span>Pink</span><span class="slider-value" id="pink-vol-val">0</span></div><input type="range" id="pink-vol" min="0" max="100" value="0"></div>
-            <div class="slider-group"><div class="slider-label"><span>White</span><span class="slider-value" id="white-vol-val">0</span></div><input type="range" id="white-vol" min="0" max="100" value="0"></div>
-          </div>
-
-          <div class="ambience-toggles">
-            <div class="toggle-row">
-              <span>Nature sounds</span>
+              <span>Nature</span>
               <button class="toggle-switch" id="nature-toggle"></button>
             </div>
             <div class="nature-types">
@@ -291,6 +295,16 @@
 
           <div class="ambience-toggles">
             <div class="toggle-row">
+              <span>Noise</span>
+              <button class="toggle-switch active" id="noise-toggle"></button>
+            </div>
+            <div class="slider-group"><div class="slider-label"><span>Brown</span><span class="slider-value" id="brown-vol-val">40</span></div><input type="range" id="brown-vol" min="0" max="100" value="40"></div>
+            <div class="slider-group"><div class="slider-label"><span>Pink</span><span class="slider-value" id="pink-vol-val">0</span></div><input type="range" id="pink-vol" min="0" max="100" value="0"></div>
+            <div class="slider-group"><div class="slider-label"><span>White</span><span class="slider-value" id="white-vol-val">0</span></div><input type="range" id="white-vol" min="0" max="100" value="0"></div>
+          </div>
+
+          <div class="ambience-toggles">
+            <div class="toggle-row">
               <span>Drone</span>
               <button class="toggle-switch" id="drone-toggle"></button>
             </div>
@@ -298,36 +312,34 @@
           </div>
         </div>
 
-        <!-- STEP 4: Advanced tweaks (collapsed) -->
-        <details class="genre-details panel-section-collapsible">
-          <summary class="genre-summary">Advanced</summary>
-          <div class="slider-group"><div class="slider-label"><span>BPM</span><span class="slider-value" id="bpm-val">128</span></div><input type="range" id="bpm-slider" min="70" max="180" value="128"></div>
-          <div class="slider-group"><div class="slider-label"><span>Swing</span><span class="slider-value" id="swing-val">0</span></div><input type="range" id="swing-slider" min="0" max="30" value="0"></div>
-          <div class="slider-group"><div class="slider-label"><span>Bass Filter</span><span class="slider-value" id="bass-cutoff-val">400</span></div><input type="range" id="bass-cutoff" min="100" max="5000" value="400"></div>
-          <div class="slider-group"><div class="slider-label"><span>Resonance</span><span class="slider-value" id="bass-reso-val">1</span></div><input type="range" id="bass-reso" min="0" max="20" value="1" step="0.5"></div>
-        </details>
-
-        <!-- Sound Design controls -->
-        <details class="genre-details panel-section-collapsible">
-          <summary class="genre-summary">Sound Design</summary>
-          <div class="slider-group"><div class="slider-label"><span>Reverb</span><span class="slider-value" id="reverb-val">50</span></div><input type="range" id="reverb-slider" min="0" max="100" value="50"></div>
-          <div class="slider-group"><div class="slider-label"><span>Delay</span><span class="slider-value" id="delay-val">40</span></div><input type="range" id="delay-slider" min="0" max="100" value="40"></div>
-          <div class="slider-group"><div class="slider-label"><span>Density</span><span class="slider-value" id="density-val">70</span></div><input type="range" id="density-slider" min="10" max="100" value="70"></div>
-          <div class="slider-group"><div class="slider-label"><span>Pad Attack</span><span class="slider-value" id="pad-attack-val">50</span></div><input type="range" id="pad-attack-slider" min="0" max="100" value="50"></div>
-          <div class="slider-group">
-            <div class="slider-label"><span>Arp Pattern</span></div>
-            <div class="arp-pattern-grid">
-              <button class="arp-pattern-btn active" data-pattern="up">Up</button>
-              <button class="arp-pattern-btn" data-pattern="down">Down</button>
-              <button class="arp-pattern-btn" data-pattern="up-down">Up/Down</button>
-              <button class="arp-pattern-btn" data-pattern="random">Random</button>
-            </div>
+        <!-- ═══════════════════════════════════════════════
+             LAYER 3: NEURAL (Binaural beats / brainwave entrainment)
+             Research: Binaural beats are most effective paired
+             with simple noise or drone - NOT with complex music.
+             Frequency masking makes them inaudible over music.
+             ═══════════════════════════════════════════════ -->
+        <div class="panel-layer">
+          <div class="layer-header">
+            <div class="layer-badge layer-badge-neural">3</div>
+            <h4 class="layer-title">Neural</h4>
+            <span class="layer-hint">Brainwave entrainment</span>
+            <button class="toggle-switch active" id="binaural-toggle"></button>
           </div>
-        </details>
 
-        <div class="notice" style="margin-top:0.5rem;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
-          Headphones recommended
+          <p class="layer-note">Works best with noise or drone. Music masks the binaural effect &mdash; lower music volume for best results.</p>
+
+          <div class="brain-states brain-states-compact">
+            <button class="state-btn" data-freq="6"><span class="freq">&theta; 6Hz</span><span class="desc">Creative</span></button>
+            <button class="state-btn active" data-freq="10"><span class="freq">&alpha; 10Hz</span><span class="desc">Focus</span></button>
+            <button class="state-btn" data-freq="18"><span class="freq">&beta; 18Hz</span><span class="desc">Active</span></button>
+            <button class="state-btn" data-freq="40"><span class="freq">&gamma; 40Hz</span><span class="desc">Peak</span></button>
+          </div>
+          <div class="slider-group"><div class="slider-label"><span>Intensity</span><span class="slider-value" id="binaural-vol-val">30</span></div><input type="range" id="binaural-vol" min="0" max="100" value="30"></div>
+
+          <div class="notice" style="margin-top:0.5rem;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+            Stereo headphones required
+          </div>
         </div>
       </div>
     </div>
