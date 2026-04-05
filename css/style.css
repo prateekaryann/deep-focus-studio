@@ -2575,8 +2575,98 @@ button:focus-visible,
 }
 
 .layer-badge-music { background: rgba(99, 102, 241, 0.25); color: var(--accent); }
+.layer-badge-tracks { background: rgba(245, 158, 11, 0.2); color: #f59e0b; font-size: 0.8rem; }
 .layer-badge-ambient { background: rgba(16, 185, 129, 0.2); color: var(--success); }
 .layer-badge-neural { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+
+/* ── Track Player ── */
+.track-genre-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.track-genre-tab {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.track-genre-tab:hover { background: rgba(255,255,255,0.08); }
+.track-genre-tab.active {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+}
+
+.track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+}
+.track-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  background: var(--glass-bg);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.track-item:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: var(--glass-border);
+}
+.track-item.playing {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.track-item-play {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.15);
+  border: none;
+  color: #f59e0b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  font-size: 0.65rem;
+  transition: background 0.15s;
+}
+.track-item-play:hover { background: rgba(245, 158, 11, 0.3); }
+.track-item.playing .track-item-play {
+  background: #f59e0b;
+  color: #000;
+}
+.track-item-info {
+  flex: 1;
+  min-width: 0;
+}
+.track-item-name {
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.track-item-genre {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
 
 .layer-title {
   font-size: 0.9rem;
@@ -2776,6 +2866,216 @@ button:focus-visible,
 /* -------------------------------------------------------
    20. Print Styles
    ------------------------------------------------------- */
+/* -------------------------------------------------------
+   Pause Overlay
+   ------------------------------------------------------- */
+.pause-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 6, 11, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn 0.3s ease;
+  pointer-events: none;
+}
+
+.pause-overlay.visible {
+  display: flex;
+}
+
+.pause-overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pause-label {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pause-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* -------------------------------------------------------
+   End Session Confirmation Dialog
+   ------------------------------------------------------- */
+.confirm-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 6, 11, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s ease;
+}
+
+.confirm-dialog-backdrop.visible {
+  display: flex;
+}
+
+.confirm-dialog {
+  background: rgba(20, 20, 35, 0.95);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  max-width: 380px;
+  width: 90%;
+  text-align: center;
+  animation: slideUp 0.3s ease;
+}
+
+.confirm-dialog h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.confirm-dialog p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 1.5rem;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.confirm-dialog-actions .btn {
+  flex: 1;
+}
+
+/* -------------------------------------------------------
+   Breathing Exercise Intro
+   ------------------------------------------------------- */
+.breathing-intro {
+  text-align: center;
+  margin-bottom: 2rem;
+  max-width: 340px;
+  animation: fadeIn 0.6s ease;
+}
+
+.breathing-intro h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.breathing-intro p {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 0.5rem;
+}
+
+.breathing-steps-hint {
+  font-size: 0.75rem !important;
+  color: var(--accent) !important;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* -------------------------------------------------------
+   Toast Notifications
+   ------------------------------------------------------- */
+.toast-container {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast-item {
+  padding: 0.65rem 1.1rem;
+  background: rgba(20, 20, 35, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  animation: toastIn 0.3s ease forwards;
+  pointer-events: auto;
+}
+
+.toast-item.toast-out {
+  animation: toastOut 0.3s ease forwards;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(20px); }
+}
+
+/* -------------------------------------------------------
+   Task Empty State
+   ------------------------------------------------------- */
+.task-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.task-empty-state svg {
+  opacity: 0.3;
+}
+
+.task-empty-state p {
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* -------------------------------------------------------
+   Session Complete Confetti
+   ------------------------------------------------------- */
+.confetti-piece {
+  position: fixed;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  z-index: 10;
+  pointer-events: none;
+  animation: confettiFall linear forwards;
+}
+
+@keyframes confettiFall {
+  0% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(100vh) rotate(720deg) scale(0.5); }
+}
+
 @media print {
   body {
     background: #fff;

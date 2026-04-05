@@ -264,6 +264,36 @@
         </div>
 
         <!-- ═══════════════════════════════════════════════
+             LAYER 1.5: PRE-RECORDED TRACKS
+             Real music tracks as an alternative to synthesized music.
+             ═══════════════════════════════════════════════ -->
+        <div class="panel-layer">
+          <div class="layer-header">
+            <div class="layer-badge layer-badge-tracks">&#9835;</div>
+            <h4 class="layer-title">Tracks</h4>
+            <span class="layer-hint">Pre-recorded music</span>
+          </div>
+
+          <div class="track-genre-tabs">
+            <button class="track-genre-tab active" data-genre="all">All</button>
+            <button class="track-genre-tab" data-genre="techno">Techno</button>
+            <button class="track-genre-tab" data-genre="lofi">Lofi</button>
+            <button class="track-genre-tab" data-genre="ambient">Ambient</button>
+            <button class="track-genre-tab" data-genre="edm">EDM</button>
+          </div>
+
+          <div class="track-list" id="track-list"></div>
+
+          <div class="slider-group" id="track-vol-group" style="display:none;">
+            <div class="slider-label">
+              <span>Track Volume</span>
+              <span class="slider-value" id="track-vol-val">60</span>
+            </div>
+            <input type="range" id="track-vol" min="0" max="100" value="60">
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
              LAYER 2: SOUNDSCAPE (Low-mid freq, masks distractions)
              Research: Nature/noise sounds mask environmental
              distractions. Should NOT compete with music in
@@ -367,6 +397,27 @@
       </div>
     </div>
 
+    <!-- Pause overlay -->
+    <div class="pause-overlay" id="pause-overlay">
+      <div class="pause-overlay-content">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent);opacity:0.7"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>
+        <span class="pause-label">Paused</span>
+        <span class="pause-hint">Press Space or tap Play to resume</span>
+      </div>
+    </div>
+
+    <!-- End session confirmation -->
+    <div class="confirm-dialog-backdrop" id="confirm-end-backdrop">
+      <div class="confirm-dialog">
+        <h3>End Session?</h3>
+        <p>You'll lose your current timer progress. Your tasks and notes will be saved.</p>
+        <div class="confirm-dialog-actions">
+          <button class="btn btn-secondary" id="confirm-end-cancel">Keep Going</button>
+          <button class="btn btn-danger" id="confirm-end-yes">End Session</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Panel backdrop (click to close) -->
     <div class="panel-backdrop" id="panel-backdrop"></div>
 
@@ -379,6 +430,11 @@
        ============================================================ -->
   <div class="breathing-overlay" id="breathing-overlay">
     <div class="breathing-content">
+      <div class="breathing-intro" id="breathing-intro">
+        <h3>4-7-8 Breathing</h3>
+        <p>This technique activates your parasympathetic nervous system, lowering cortisol and priming your prefrontal cortex for deep focus.</p>
+        <p class="breathing-steps-hint">Inhale 4s &rarr; Hold 7s &rarr; Exhale 8s &times; 3 cycles</p>
+      </div>
       <div class="breathing-circle" id="breathing-circle"></div>
       <div class="breathing-text" id="breathing-text">Preparing...</div>
       <button class="btn btn-ghost breathing-skip" id="breathing-skip">Skip</button>
@@ -501,6 +557,9 @@
       <button class="btn btn-secondary btn-export" id="btn-export">Export Data (JSON)</button>
     </div>
   </div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toast-container"></div>
 
   <!-- Scripts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>

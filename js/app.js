@@ -19,6 +19,42 @@
   let isMuted = false;
   let preMuteVolume = 50;
 
+  // ─── Toast Notification System ──────────────────────────────────────
+
+  function showToast(message, duration) {
+    duration = duration || 2000;
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast-item';
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.classList.add('toast-out');
+      setTimeout(() => toast.remove(), 300);
+    }, duration);
+  }
+
+  // ─── Confetti Celebration ───────────────────────────────────────────
+
+  function launchConfetti() {
+    const colors = ['#6366f1', '#10b981', '#f59e0b', '#818cf8', '#34d399', '#a78bfa'];
+    for (let i = 0; i < 40; i++) {
+      const piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      piece.style.left = (Math.random() * 100) + 'vw';
+      piece.style.top = '-10px';
+      piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.animationDuration = (2 + Math.random() * 2) + 's';
+      piece.style.animationDelay = (Math.random() * 0.5) + 's';
+      piece.style.width = (6 + Math.random() * 6) + 'px';
+      piece.style.height = (6 + Math.random() * 6) + 'px';
+      piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+      document.body.appendChild(piece);
+      setTimeout(() => piece.remove(), 5000);
+    }
+  }
+
   // ─── Neuroscience Tips ───────────────────────────────────────────────
 
   const tips = [
@@ -250,24 +286,30 @@
     const btn = document.getElementById('btn-timer-toggle');
     if (!btn) return;
     btn.innerHTML = playing
-      ? '<i class="fas fa-pause"></i>'
-      : '<i class="fas fa-play"></i>';
+      ? '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>'
+      : '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
   }
 
   function togglePlayPause() {
     const session = sessionManager.getActiveSession();
     if (!session) return;
 
+    const pauseOverlay = document.getElementById('pause-overlay');
+
     if (timerInterval) {
       stopTimer();
       sessionManager.pauseSession();
       if (audioEngine && audioEngine.playing) audioEngine.stop();
+      if (pauseOverlay) pauseOverlay.classList.add('visible');
+      showToast('Session paused');
     } else {
       sessionManager.resumeSession();
       startTimer();
       if (audioEngine) {
         audioEngine.init().then(() => audioEngine.start()).catch(() => {});
       }
+      if (pauseOverlay) pauseOverlay.classList.remove('visible');
+      showToast('Session resumed');
     }
   }
 
@@ -279,7 +321,22 @@
     if (btnToggle) btnToggle.addEventListener('click', togglePlayPause);
 
     const btnReset = document.getElementById('btn-timer-reset');
-    if (btnReset) btnReset.addEventListener('click', completeSession);
+    if (btnReset) btnReset.addEventListener('click', confirmEndSession);
+
+    // End session confirmation dialog
+    const confirmCancel = document.getElementById('confirm-end-cancel');
+    const confirmYes = document.getElementById('confirm-end-yes');
+    const confirmBackdrop = document.getElementById('confirm-end-backdrop');
+    if (confirmCancel) confirmCancel.addEventListener('click', () => {
+      if (confirmBackdrop) confirmBackdrop.classList.remove('visible');
+    });
+    if (confirmYes) confirmYes.addEventListener('click', () => {
+      if (confirmBackdrop) confirmBackdrop.classList.remove('visible');
+      completeSession();
+    });
+    if (confirmBackdrop) confirmBackdrop.addEventListener('click', (e) => {
+      if (e.target === confirmBackdrop) confirmBackdrop.classList.remove('visible');
+    });
 
     // Master controls
     wireToggle('master-play', () => {
@@ -411,6 +468,64 @@
       });
     });
 
+    // ── Track Player ──
+    (function initTrackPlayer() {
+      const trackList = document.getElementById('track-list');
+      if (!trackList) return;
+
+      const tracks = window.AudioEngine.TRACKS;
+      let activeGenre = 'all';
+
+      function renderTracks() {
+        const filtered = activeGenre === 'all' ? tracks : tracks.filter(t => t.genre === activeGenre);
+        const currentId = audioEngine ? audioEngine.getCurrentTrackId() : null;
+        trackList.innerHTML = filtered.map(t => {
+          const isPlaying = t.id === currentId;
+          return '<div class="track-item' + (isPlaying ? ' playing' : '') + '" data-track="' + t.id + '">'
+            + '<button class="track-item-play">' + (isPlaying ? '&#9632;' : '&#9654;') + '</button>'
+            + '<div class="track-item-info">'
+            + '<div class="track-item-name">' + t.name + '</div>'
+            + '<div class="track-item-genre">' + t.genre + '</div>'
+            + '</div></div>';
+        }).join('');
+
+        // Show/hide volume slider
+        const volGroup = document.getElementById('track-vol-group');
+        if (volGroup) volGroup.style.display = currentId ? 'block' : 'none';
+      }
+
+      trackList.addEventListener('click', function(e) {
+        const item = e.target.closest('.track-item');
+        if (!item || !audioEngine) return;
+        const trackId = item.dataset.track;
+        if (audioEngine.getCurrentTrackId() === trackId) {
+          audioEngine.stopTrack();
+        } else {
+          audioEngine.playTrack(trackId);
+        }
+        renderTracks();
+      });
+
+      document.querySelectorAll('.track-genre-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.track-genre-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          activeGenre = tab.dataset.genre;
+          renderTracks();
+        });
+      });
+
+      wireSlider('track-vol', v => {
+        if (audioEngine) audioEngine.setTrackVolume(v / 100);
+      });
+
+      // Initial render
+      renderTracks();
+
+      // Re-render when track loads (slight delay for async load)
+      window._renderTrackList = renderTracks;
+    })();
+
     // Bass volume
     wireSlider('bass-vol', v => {
       if (audioEngine && audioEngine._nodes && audioEngine._nodes.bassGain) {
@@ -533,6 +648,7 @@
           // Visual feedback - spin the icon
           btnRegen.classList.add('spinning');
           setTimeout(() => btnRegen.classList.remove('spinning'), 600);
+          showToast('New variation generated');
         }
       });
     }
@@ -878,6 +994,14 @@
     if (!list) return;
     list.innerHTML = '';
     const tasks = sessionManager.getTasks();
+    if (tasks.length === 0) {
+      list.innerHTML =
+        '<div class="task-empty-state">' +
+          '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' +
+          '<p>No tasks yet. Break your goal into small tasks to stay on track.</p>' +
+        '</div>';
+      return;
+    }
     tasks.forEach(task => {
       const li = document.createElement('li');
       li.className = 'task-item' + (task.done ? ' done' : '');
@@ -926,6 +1050,9 @@
     const overlay = document.getElementById('breathing-overlay');
     if (!overlay) { onComplete(); return; }
     overlay.classList.add('active');
+    // Reset intro visibility
+    const intro = document.getElementById('breathing-intro');
+    if (intro) intro.style.display = '';
     runBreathingCycle(0, 3, onComplete);
   }
 
@@ -934,6 +1061,12 @@
       stopBreathingExercise();
       onComplete();
       return;
+    }
+
+    // Hide intro after first cycle starts
+    if (cycle > 0) {
+      const intro = document.getElementById('breathing-intro');
+      if (intro) intro.style.display = 'none';
     }
 
     const circle = document.getElementById('breathing-circle');
@@ -977,6 +1110,19 @@
     if (circle) circle.className = '';
   }
 
+  // ─── End Session Confirmation ────────────────────────────────────────
+
+  function confirmEndSession() {
+    const elapsed = sessionManager.getElapsedSeconds();
+    // If session is very short (<30s), skip confirmation
+    if (elapsed < 30) {
+      completeSession();
+      return;
+    }
+    const backdrop = document.getElementById('confirm-end-backdrop');
+    if (backdrop) backdrop.classList.add('visible');
+  }
+
   // ─── Session Complete ───────────────────────────────────────────────
 
   function completeSession() {
@@ -1010,7 +1156,12 @@
     const notesEl = document.getElementById('complete-notes');
     if (notesEl) notesEl.value = focusNotes;
 
+    // Hide pause overlay if visible
+    const pauseOverlay = document.getElementById('pause-overlay');
+    if (pauseOverlay) pauseOverlay.classList.remove('visible');
+
     showScreen('screen-complete');
+    launchConfetti();
   }
 
   function initCompleteScreen() {
@@ -1037,6 +1188,9 @@
     if (goalInput) goalInput.value = '';
     document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('.timer-preset-btn').forEach(b => b.classList.remove('active'));
+    // Re-activate 25 min default
+    const defaultTimerBtn = document.querySelector('.timer-preset-btn[data-minutes="25"]');
+    if (defaultTimerBtn) defaultTimerBtn.classList.add('active');
     selectedPreset = null;
     selectedTimerMinutes = 25;
   }
@@ -1245,6 +1399,7 @@
       if (valEl) valEl.textContent = '0';
       isMuted = true;
     }
+    showToast(isMuted ? 'Audio muted' : 'Audio unmuted');
   }
 
   // ─── Fullscreen / Zen Mode ──────────────────────────────────────────
@@ -1330,6 +1485,21 @@
       }
     }
     showRandomTip();
+
+    // Auto-select first preset on welcome
+    const firstPreset = document.querySelector('.preset-card[data-preset]');
+    if (firstPreset && !selectedPreset) {
+      firstPreset.classList.add('active');
+      selectedPreset = firstPreset.dataset.preset;
+    }
+
+    // beforeunload warning during active session
+    window.addEventListener('beforeunload', function (e) {
+      if (sessionManager && sessionManager.getActiveSession() && timerInterval) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
   });
 
 })();

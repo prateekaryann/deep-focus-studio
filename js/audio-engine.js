@@ -317,6 +317,7 @@ class AudioEngine {
     this._buildDrone();
     this._buildNature();
     this._buildMusic();
+    this._buildTrackPlayer();
 
     this.initialized = true;
   }
@@ -2749,6 +2750,102 @@ class AudioEngine {
     }
   }
 
+  // ───────── TRACK PLAYER (Pre-recorded music) ─────────
+
+  /** Available pre-recorded tracks */
+  static TRACKS = [
+    { id: 'techno-deep-ambience',   name: 'Deep Techno Ambience',  genre: 'techno',  file: 'audio/tracks/techno-deep-ambience.mp3' },
+    { id: 'techno-minimal-01',      name: 'Minimal Techno',        genre: 'techno',  file: 'audio/tracks/techno-minimal-01.mp3' },
+    { id: 'techno-minimal-emotion', name: 'Minimal Emotion',       genre: 'techno',  file: 'audio/tracks/techno-minimal-emotion.mp3' },
+    { id: 'techno-dub-groove',      name: 'Dub Techno Groove',     genre: 'techno',  file: 'audio/tracks/techno-dub-groove.mp3' },
+    { id: 'techno-machine-drum',    name: 'Machine Drum Vibes',    genre: 'techno',  file: 'audio/tracks/techno-machine-drum.mp3' },
+    { id: 'lofi-sweet-september',   name: 'Sweet September',       genre: 'lofi',    file: 'audio/tracks/lofi-sweet-september.mp3' },
+    { id: 'lofi-sleepy-cat',        name: 'Sleepy Cat',            genre: 'lofi',    file: 'audio/tracks/lofi-sleepy-cat.mp3' },
+    { id: 'ambient-rest-now',       name: 'Rest Now',              genre: 'ambient',  file: 'audio/tracks/ambient-rest-now.mp3' },
+    { id: 'ambient-voxscape',       name: 'Voxscape',              genre: 'ambient',  file: 'audio/tracks/ambient-voxscape.mp3' },
+    { id: 'ambient-opalescent',     name: 'Opalescent',            genre: 'ambient',  file: 'audio/tracks/ambient-opalescent.mp3' },
+    { id: 'edm-atoms-in-peace',     name: 'Atoms in Peace',        genre: 'edm',     file: 'audio/tracks/edm-atoms-in-peace.mp3' },
+    { id: 'edm-kodama-night',       name: 'Kodama Night Town',     genre: 'edm',     file: 'audio/tracks/edm-kodama-night.mp3' },
+  ];
+
+  _buildTrackPlayer() {
+    this._trackPlayerGain = new Tone.Gain(0).connect(this._masterGain);
+    this._trackPlayer = null;
+    this._trackEnabled = false;
+    this._trackVolume = 0.6;
+    this._currentTrackId = null;
+  }
+
+  /** Load and play a pre-recorded track by id. Loops automatically. */
+  async playTrack(trackId) {
+    if (!this.initialized) return;
+    const track = AudioEngine.TRACKS.find(t => t.id === trackId);
+    if (!track) return;
+
+    // Stop current track if any
+    this._stopTrack();
+
+    this._currentTrackId = trackId;
+    this._trackEnabled = true;
+
+    try {
+      this._trackPlayer = new Tone.Player({
+        url: track.file,
+        loop: true,
+        fadeIn: 0.5,
+        fadeOut: 0.5,
+        onload: () => {
+          if (this._currentTrackId === trackId && this._trackEnabled) {
+            this._trackPlayerGain.gain.rampTo(this._trackVolume, 0.3);
+            this._trackPlayer.start();
+            if (window._renderTrackList) window._renderTrackList();
+          }
+        },
+        onerror: () => {
+          console.warn('Failed to load track:', track.file);
+        }
+      }).connect(this._trackPlayerGain);
+    } catch (e) {
+      console.warn('Track player error:', e);
+    }
+  }
+
+  _stopTrack() {
+    if (this._trackPlayer) {
+      this._trackPlayerGain.gain.rampTo(0, 0.3);
+      const player = this._trackPlayer;
+      setTimeout(() => {
+        try { player.stop(); player.dispose(); } catch (_) {}
+      }, 350);
+      this._trackPlayer = null;
+    }
+    this._trackEnabled = false;
+    this._currentTrackId = null;
+  }
+
+  /** Stop the track player */
+  stopTrack() {
+    this._stopTrack();
+  }
+
+  /** Set track player volume (0-1) */
+  setTrackVolume(v) {
+    this._trackVolume = v;
+    if (this._trackEnabled && this.initialized) {
+      this._trackPlayerGain.gain.rampTo(v, RAMP);
+    }
+  }
+
+  /** @returns {string|null} Currently playing track id */
+  getCurrentTrackId() {
+    return this._currentTrackId;
+  }
+
+  /** @returns {boolean} Whether a track is currently playing */
+  isTrackPlaying() {
+    return this._trackEnabled && this._trackPlayer !== null;
+  }
+
   // ───────── DISPOSE ─────────
 
   /** Clean up all audio nodes and release resources. */
@@ -2760,6 +2857,7 @@ class AudioEngine {
 
     this._teardownNatureType();
     this._teardownMusic();
+    this._stopTrack();
 
     // Dispose all nodes
     const dispose = obj => { try { if (obj && obj.dispose) obj.dispose(); } catch (_) {} };
