@@ -291,14 +291,23 @@ class AudioEngine {
   /** Initialize the Tone.js audio context and build the signal graph. */
   async init() {
     if (this.initialized) return;
+
+    // Use larger audio buffers for stable playback (ambient music doesn't need low latency)
+    if (Tone.context.state !== 'running') {
+      const ctx = new Tone.Context({ latencyHint: 'playback' });
+      Tone.setContext(ctx);
+    }
     await Tone.start();
 
     // Analysers
     this.fft = new Tone.FFT(64);
     this.waveform = new Tone.Waveform(256);
 
+    // Limiter on master to prevent clipping
+    this._limiter = new Tone.Limiter(-3).toDestination();
+
     // Master gain
-    this._masterGain = new Tone.Gain(0).toDestination();
+    this._masterGain = new Tone.Gain(0).connect(this._limiter);
     this._masterGain.connect(this.fft);
     this._masterGain.connect(this.waveform);
     this._masterGain.gain.rampTo(this._masterVolume, RAMP);
@@ -686,6 +695,19 @@ class AudioEngine {
     n.beatGain = new Tone.Gain(0).connect(n.musicGain);
     n.bassGain = new Tone.Gain(0).connect(n.musicGain);
     n.melodyGain = new Tone.Gain(0).connect(n.musicGain);
+
+    // Shared effects pool (reused across genre switches to avoid node creation)
+    n.sharedReverb = new Tone.Reverb({ decay: 4, wet: 0.3 }).connect(n.padGain);
+    n.sharedDelay = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.3, wet: 0.2 }).connect(n.sharedReverb);
+    n.sharedChorus = new Tone.Chorus({ frequency: 1.5, depth: 0.5, wet: 0.3 }).connect(n.padGain);
+    n.sharedChorus.start();
+
+    // Arp effects
+    n.sharedArpDelay = new Tone.FeedbackDelay({ delayTime: '16n', feedback: 0.25, wet: 0.2 }).connect(n.arpGain);
+
+    // Bass filter
+    n.bassFilter = new Tone.Filter(400, 'lowpass').connect(n.bassGain);
+
     this._musicParts = [];
     this._musicSynths = [];
   }
@@ -711,10 +733,20 @@ class AudioEngine {
 
   /** Dispose current music synths and parts, then rebuild for the active preset. */
   _teardownMusic() {
-    this._musicParts.forEach(p => { try { p.stop(); p.dispose(); } catch (_) {} });
+    // Fade out music gain to avoid clicks
+    const n = this._nodes;
+    if (n.musicGain) n.musicGain.gain.rampTo(0, 0.15);
+
+    // Delay actual disposal to let fade complete
+    const partsToDispose = [...this._musicParts];
+    const synthsToDispose = [...this._musicSynths];
     this._musicParts = [];
-    this._musicSynths.forEach(s => { try { if (s.stop) s.stop(); s.dispose(); } catch (_) {} });
     this._musicSynths = [];
+
+    setTimeout(() => {
+      partsToDispose.forEach(p => { try { p.stop(); p.dispose(); } catch (_) {} });
+      synthsToDispose.forEach(s => { try { if (s.stop) s.stop(); s.dispose(); } catch (_) {} });
+    }, 200);
   }
 
   // ── Shared helpers for pattern variation ──
@@ -824,6 +856,10 @@ class AudioEngine {
     n.melodyGain.gain.rampTo(this._melodyEnabled ? this._melodyVolume : 0, RAMP);
     n.musicGain.gain.rampTo(1, RAMP);
 
+    // Reconnect shared bass filter to bassGain (may have been rerouted by previous genre)
+    try { n.bassFilter.disconnect(); } catch (_) {}
+    n.bassFilter.connect(n.bassGain);
+
     // Each genre has its own builder for distinct sound
     switch (presetName) {
       case 'minimal': this._buildMinimal(preset); break;
@@ -854,21 +890,11 @@ class AudioEngine {
     const barLen = Tone.Time('1m').toSeconds();
 
     try {
-      const melodyReverb = new Tone.Reverb({ decay: 4, wet: 0.4 }).connect(n.melodyGain);
-      this._trackReverb(melodyReverb);
-      this._musicSynths.push(melodyReverb);
-
-      const melodyDelay = new Tone.PingPongDelay({
-        delayTime: '8n.', feedback: 0.3, wet: 0.25,
-      }).connect(melodyReverb);
-      this._trackDelay(melodyDelay);
-      this._musicSynths.push(melodyDelay);
-
       const melodySynth = new Tone.Synth({
         oscillator: { type: 'triangle' },
         envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1.5 },
         volume: -6,
-      }).connect(melodyDelay);
+      }).connect(n.melodyGain);
       this._musicSynths.push(melodySynth);
 
       const style = this._melodyStyle;
@@ -938,12 +964,13 @@ class AudioEngine {
 
     // Pad: FMSynth - metallic/bell tones
     try {
-      const padReverb = new Tone.Reverb({ decay: 6, wet: this._getReverbWet() }).connect(n.padGain);
-      this._trackReverb(padReverb);
-      this._musicSynths.push(padReverb);
+      // Configure shared reverb for this genre
+      n.sharedReverb.decay = 6;
+      n.sharedReverb.wet.rampTo(this._getReverbWet(), 0.1);
+      this._trackReverb(n.sharedReverb);
 
       const padSynth = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 6,
+        maxPolyphony: 4,
         voice: Tone.FMSynth,
         options: {
           harmonicity: 1.414,
@@ -953,7 +980,7 @@ class AudioEngine {
           modulationEnvelope: { attack: 2, decay: 1, sustain: 0.5, release: 3 },
           volume: -8,
         },
-      }).connect(padReverb);
+      }).connect(n.sharedReverb);
       this._musicSynths.push(padSynth);
 
       const padPart = new Tone.Part((time, chord) => {
@@ -967,17 +994,17 @@ class AudioEngine {
       this._musicParts.push(padPart);
     } catch (_) {}
 
-    // Arp: PluckSynth - plucked string through PingPongDelay
+    // Arp: PluckSynth - plucked string through shared arp delay
     try {
-      const ppDelay = new Tone.PingPongDelay({
-        delayTime: '8n.', feedback: this._getDelayFeedback(0.4), wet: 0.35,
-      }).connect(n.arpGain);
-      this._trackDelay(ppDelay);
-      this._musicSynths.push(ppDelay);
+      // Configure shared arp delay for this genre
+      n.sharedArpDelay.delayTime.rampTo(Tone.Time('8n.').toSeconds(), 0.1);
+      n.sharedArpDelay.feedback.rampTo(this._getDelayFeedback(0.4), 0.1);
+      n.sharedArpDelay.wet.rampTo(0.35, 0.1);
+      this._trackDelay(n.sharedArpDelay);
 
       const arpSynth = new Tone.PluckSynth({
         attackNoise: 1, resonance: 0.95, release: 1.2, volume: -10,
-      }).connect(ppDelay);
+      }).connect(n.sharedArpDelay);
       this._musicSynths.push(arpSynth);
 
       // Sparse: only 4 notes per bar
@@ -1054,22 +1081,22 @@ class AudioEngine {
 
     // Pad: Sawtooth PolySynth → Chorus → Reverb (classic Detroit string pad)
     try {
-      const padReverb = new Tone.Reverb({ decay: 4, wet: 0.35 }).connect(n.padGain);
-      this._musicSynths.push(padReverb);
-
-      const padChorus = new Tone.Chorus({ frequency: 2, depth: 0.6, wet: 0.5 }).connect(padReverb);
-      padChorus.start();
-      this._musicSynths.push(padChorus);
+      // Configure shared effects for Detroit
+      n.sharedReverb.decay = 4;
+      n.sharedReverb.wet.rampTo(0.35, 0.1);
+      n.sharedChorus.frequency.rampTo(2, 0.1);
+      n.sharedChorus.depth = 0.6;
+      n.sharedChorus.wet.rampTo(0.5, 0.1);
 
       const padSynth = new Tone.PolySynth(Tone.Synth, {
-        maxPolyphony: 6,
+        maxPolyphony: 4,
         voice: Tone.Synth,
         options: {
           oscillator: { type: 'sawtooth' },
           envelope: { attack: 0.8, decay: 1.5, sustain: 0.6, release: 2 },
           volume: -8,
         },
-      }).connect(padChorus);
+      }).connect(n.sharedChorus);
       this._musicSynths.push(padSynth);
 
       const padPart = new Tone.Part((time, chord) => {
@@ -1127,13 +1154,10 @@ class AudioEngine {
       }).connect(n.beatGain);
       this._musicSynths.push(kick);
 
-      // Hat: metallic via bandpass filter
-      const hatFilter = new Tone.Filter({ frequency: 8000, type: 'bandpass', Q: 3 }).connect(n.beatGain);
-      this._musicSynths.push(hatFilter);
       const hat = new Tone.NoiseSynth({
         volume: -10,
         envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.02 },
-      }).connect(hatFilter);
+      }).connect(n.beatGain);
       this._musicSynths.push(hat);
 
       const snare = new Tone.NoiseSynth({
@@ -1168,19 +1192,16 @@ class AudioEngine {
 
     // Bass: Sawtooth MonoSynth, melodic 8th-note pattern
     try {
-      const bassFilter = new Tone.Filter({
-        frequency: this._bassFilterCutoff || 800, type: 'lowpass',
-        Q: this._bassFilterQ || 2,
-      }).connect(n.bassGain);
-      n.bassFilter = bassFilter;
-      this._musicSynths.push(bassFilter);
+      // Configure shared bass filter for Detroit
+      n.bassFilter.frequency.rampTo(this._bassFilterCutoff || 800, 0.1);
+      n.bassFilter.Q.rampTo(this._bassFilterQ || 2, 0.1);
 
       const bassSynth = new Tone.MonoSynth({
         oscillator: { type: 'sawtooth' },
         filter: { type: 'lowpass', frequency: 800, Q: 2 },
         envelope: { attack: 0.01, decay: 0.2, sustain: 0.3, release: 0.3 },
         volume: -8,
-      }).connect(bassFilter);
+      }).connect(n.bassFilter);
       this._musicSynths.push(bassSynth);
 
       const bassEvents = [];
@@ -1255,12 +1276,9 @@ class AudioEngine {
 
     // Bass: THE STAR - acid 303 style
     try {
-      const bassFilter = new Tone.Filter({
-        frequency: this._bassFilterCutoff || 300, type: 'lowpass',
-        Q: this._bassFilterQ || 12,
-      }).connect(n.bassGain);
-      n.bassFilter = bassFilter;
-      this._musicSynths.push(bassFilter);
+      // Configure shared bass filter for acid
+      n.bassFilter.frequency.rampTo(this._bassFilterCutoff || 300, 0.1);
+      n.bassFilter.Q.rampTo(this._bassFilterQ || 12, 0.1);
 
       const bassSynth = new Tone.MonoSynth({
         oscillator: { type: 'sawtooth' },
@@ -1271,7 +1289,7 @@ class AudioEngine {
         },
         envelope: { attack: 0.005, decay: 0.12, sustain: 0.15, release: 0.2 },
         volume: -4,
-      }).connect(bassFilter);
+      }).connect(n.bassFilter);
       this._musicSynths.push(bassSynth);
 
       // Generate 16-step pattern with random accents and slides
@@ -1336,23 +1354,22 @@ class AudioEngine {
 
     // Pad: Sawtooth → MASSIVE Reverb(10s) → FeedbackDelay
     try {
-      const padDelay = new Tone.FeedbackDelay({
-        delayTime: '4n.', feedback: 0.7, wet: 0.5,
-      }).connect(n.padGain);
-      this._musicSynths.push(padDelay);
-
-      const padReverb = new Tone.Reverb({ decay: 10, wet: 0.7 }).connect(padDelay);
-      this._musicSynths.push(padReverb);
+      // Configure shared effects for dub techno (massive reverb + delay)
+      n.sharedDelay.delayTime.rampTo(Tone.Time('4n.').toSeconds(), 0.1);
+      n.sharedDelay.feedback.rampTo(0.7, 0.1);
+      n.sharedDelay.wet.rampTo(0.5, 0.1);
+      n.sharedReverb.decay = 10;
+      n.sharedReverb.wet.rampTo(0.7, 0.1);
 
       const padSynth = new Tone.PolySynth(Tone.Synth, {
-        maxPolyphony: 6,
+        maxPolyphony: 4,
         voice: Tone.Synth,
         options: {
           oscillator: { type: 'sawtooth' },
           envelope: { attack: 1.5, decay: 2, sustain: 0.5, release: 4 },
           volume: -10,
         },
-      }).connect(padReverb);
+      }).connect(n.sharedDelay);
       this._musicSynths.push(padSynth);
 
       // Sparse: chord stab every 2 bars
@@ -1368,19 +1385,16 @@ class AudioEngine {
       this._musicParts.push(padPart);
     } catch (_) {}
 
-    // Arp: PluckSynth through same massive delay chain, sparse
+    // Arp: PluckSynth through shared arp delay, sparse
     try {
-      const arpDelay = new Tone.FeedbackDelay({
-        delayTime: '4n.', feedback: 0.65, wet: 0.6,
-      }).connect(n.arpGain);
-      this._musicSynths.push(arpDelay);
-
-      const arpReverb = new Tone.Reverb({ decay: 8, wet: 0.5 }).connect(arpDelay);
-      this._musicSynths.push(arpReverb);
+      // Configure shared arp delay for dub techno
+      n.sharedArpDelay.delayTime.rampTo(Tone.Time('4n.').toSeconds(), 0.1);
+      n.sharedArpDelay.feedback.rampTo(0.65, 0.1);
+      n.sharedArpDelay.wet.rampTo(0.6, 0.1);
 
       const arpSynth = new Tone.PluckSynth({
         attackNoise: 0.8, resonance: 0.9, release: 1, volume: -14,
-      }).connect(arpReverb);
+      }).connect(n.sharedArpDelay);
       this._musicSynths.push(arpSynth);
 
       const arpEvents = [];
@@ -1412,13 +1426,11 @@ class AudioEngine {
       }).connect(n.beatGain);
       this._musicSynths.push(kick);
 
-      // Hat: Very sparse, with reverb
-      const hatReverb = new Tone.Reverb({ decay: 3, wet: 0.4 }).connect(n.beatGain);
-      this._musicSynths.push(hatReverb);
+      // Hat: Very sparse
       const hat = new Tone.NoiseSynth({
         volume: -14,
         envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.03 },
-      }).connect(hatReverb);
+      }).connect(n.beatGain);
       this._musicSynths.push(hat);
 
       const beatPart = new Tone.Part((time, type) => {
@@ -1440,18 +1452,15 @@ class AudioEngine {
 
     // Bass: Sine sub, just root notes
     try {
-      const bassFilter = new Tone.Filter({
-        frequency: this._bassFilterCutoff || 300, type: 'lowpass',
-        Q: this._bassFilterQ || 1,
-      }).connect(n.bassGain);
-      n.bassFilter = bassFilter;
-      this._musicSynths.push(bassFilter);
+      // Configure shared bass filter for dub techno
+      n.bassFilter.frequency.rampTo(this._bassFilterCutoff || 300, 0.1);
+      n.bassFilter.Q.rampTo(this._bassFilterQ || 1, 0.1);
 
       const bassSynth = new Tone.MonoSynth({
         oscillator: { type: 'sine' },
         envelope: { attack: 0.05, decay: 0.5, sustain: 0.6, release: 0.8 },
         volume: -6,
-      }).connect(bassFilter);
+      }).connect(n.bassFilter);
       this._musicSynths.push(bassSynth);
 
       const bassEvents = [];
@@ -1476,26 +1485,26 @@ class AudioEngine {
     const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
 
-    // Pad: SUPERSAW - 5 detuned sawtooths → Chorus → Reverb
+    // Pad: SUPERSAW - 3 detuned sawtooths → shared Chorus → shared Reverb
     try {
-      const padReverb = new Tone.Reverb({ decay: 5, wet: 0.3 }).connect(n.padGain);
-      this._musicSynths.push(padReverb);
+      // Configure shared effects for trance
+      n.sharedReverb.decay = 5;
+      n.sharedReverb.wet.rampTo(0.3, 0.1);
+      n.sharedChorus.frequency.rampTo(1.5, 0.1);
+      n.sharedChorus.depth = 0.5;
+      n.sharedChorus.wet.rampTo(0.4, 0.1);
 
-      const padChorus = new Tone.Chorus({ frequency: 1.5, depth: 0.5, wet: 0.4 }).connect(padReverb);
-      padChorus.start();
-      this._musicSynths.push(padChorus);
-
-      const detunes = [-20, -10, 0, 10, 20];
+      const detunes = [-15, 0, 15];
       detunes.forEach(detune => {
         const synth = new Tone.PolySynth(Tone.Synth, {
-          maxPolyphony: 6,
+          maxPolyphony: 4,
           voice: Tone.Synth,
           options: {
             oscillator: { type: 'sawtooth', detune: detune },
             envelope: { attack: 0.5, decay: 1, sustain: 0.8, release: 2 },
             volume: -14,
           },
-        }).connect(padChorus);
+        }).connect(n.sharedChorus);
         this._musicSynths.push(synth);
 
         const padPart = new Tone.Part((time, chord) => {
@@ -1581,19 +1590,16 @@ class AudioEngine {
 
     // Bass: Sawtooth pumping 8ths
     try {
-      const bassFilter = new Tone.Filter({
-        frequency: this._bassFilterCutoff || 600, type: 'lowpass',
-        Q: this._bassFilterQ || 3,
-      }).connect(n.bassGain);
-      n.bassFilter = bassFilter;
-      this._musicSynths.push(bassFilter);
+      // Configure shared bass filter for trance
+      n.bassFilter.frequency.rampTo(this._bassFilterCutoff || 600, 0.1);
+      n.bassFilter.Q.rampTo(this._bassFilterQ || 3, 0.1);
 
       const bassSynth = new Tone.MonoSynth({
         oscillator: { type: 'sawtooth' },
         filter: { type: 'lowpass', frequency: 600, Q: 3 },
         envelope: { attack: 0.01, decay: 0.15, sustain: 0.2, release: 0.2 },
         volume: -8,
-      }).connect(bassFilter);
+      }).connect(n.bassFilter);
       this._musicSynths.push(bassSynth);
 
       const bassEvents = [];
@@ -1631,16 +1637,14 @@ class AudioEngine {
     const barLen = Tone.Time('1m').toSeconds();
     const swing = this._swing || preset.swing || 0.1;
 
-    // Pad: FMSynth Rhodes-like → Phaser → Reverb
+    // Pad: FMSynth Rhodes-like → shared Reverb
     try {
-      const padReverb = new Tone.Reverb({ decay: 4, wet: 0.35 }).connect(n.padGain);
-      this._musicSynths.push(padReverb);
-
-      const padPhaser = new Tone.Phaser({ frequency: 0.3, octaves: 3, baseFrequency: 600 }).connect(padReverb);
-      this._musicSynths.push(padPhaser);
+      // Configure shared reverb for DnB
+      n.sharedReverb.decay = 4;
+      n.sharedReverb.wet.rampTo(0.35, 0.1);
 
       const padSynth = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 6,
+        maxPolyphony: 4,
         voice: Tone.FMSynth,
         options: {
           harmonicity: 3.5,
@@ -1650,7 +1654,7 @@ class AudioEngine {
           modulationEnvelope: { attack: 0.5, decay: 1, sustain: 0.3, release: 2 },
           volume: -10,
         },
-      }).connect(padPhaser);
+      }).connect(n.sharedReverb);
       this._musicSynths.push(padSynth);
 
       const padPart = new Tone.Part((time, chord) => {
@@ -1666,14 +1670,14 @@ class AudioEngine {
 
     // Arp: PluckSynth fast arps
     try {
-      const arpDelay = new Tone.FeedbackDelay({
-        delayTime: '8n', feedback: 0.2, wet: 0.2,
-      }).connect(n.arpGain);
-      this._musicSynths.push(arpDelay);
+      // Configure shared arp delay for DnB
+      n.sharedArpDelay.delayTime.rampTo(Tone.Time('8n').toSeconds(), 0.1);
+      n.sharedArpDelay.feedback.rampTo(0.2, 0.1);
+      n.sharedArpDelay.wet.rampTo(0.2, 0.1);
 
       const arpSynth = new Tone.PluckSynth({
         attackNoise: 0.8, resonance: 0.9, release: 0.8, volume: -12,
-      }).connect(arpDelay);
+      }).connect(n.sharedArpDelay);
       this._musicSynths.push(arpSynth);
 
       const arpEvents = [];
@@ -1745,18 +1749,15 @@ class AudioEngine {
 
     // Bass: REESE - two detuned sawtooths through lowpass, with portamento
     try {
-      const bassFilter = new Tone.Filter({
-        frequency: this._bassFilterCutoff || 500, type: 'lowpass',
-        Q: this._bassFilterQ || 2,
-      }).connect(n.bassGain);
-      n.bassFilter = bassFilter;
-      this._musicSynths.push(bassFilter);
+      // Configure shared bass filter for DnB
+      n.bassFilter.frequency.rampTo(this._bassFilterCutoff || 500, 0.1);
+      n.bassFilter.Q.rampTo(this._bassFilterQ || 2, 0.1);
 
       const reese1 = new Tone.Synth({
         oscillator: { type: 'sawtooth', detune: 5 },
         envelope: { attack: 0.02, decay: 0.3, sustain: 0.6, release: 0.4 },
         volume: -8,
-      }).connect(bassFilter);
+      }).connect(n.bassFilter);
       reese1.portamento = 0.05;
       this._musicSynths.push(reese1);
 
@@ -1764,7 +1765,7 @@ class AudioEngine {
         oscillator: { type: 'sawtooth', detune: -5 },
         envelope: { attack: 0.02, decay: 0.3, sustain: 0.6, release: 0.4 },
         volume: -8,
-      }).connect(bassFilter);
+      }).connect(n.bassFilter);
       reese2.portamento = 0.05;
       this._musicSynths.push(reese2);
 
@@ -1797,17 +1798,17 @@ class AudioEngine {
     const barLen = Tone.Time('1m').toSeconds();
     const swing = this._swing || preset.swing || 0.15;
 
-    // Pad: FMSynth electric piano / Rhodes → Chorus
+    // Pad: FMSynth electric piano / Rhodes → shared Chorus → shared Reverb
     try {
-      const padChorus = new Tone.Chorus({ frequency: 1.5, depth: 0.4, wet: 0.4 }).connect(n.padGain);
-      padChorus.start();
-      this._musicSynths.push(padChorus);
-
-      const padReverb = new Tone.Reverb({ decay: 3, wet: 0.25 }).connect(padChorus);
-      this._musicSynths.push(padReverb);
+      // Configure shared effects for deep house
+      n.sharedChorus.frequency.rampTo(1.5, 0.1);
+      n.sharedChorus.depth = 0.4;
+      n.sharedChorus.wet.rampTo(0.4, 0.1);
+      n.sharedReverb.decay = 3;
+      n.sharedReverb.wet.rampTo(0.25, 0.1);
 
       const padSynth = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 6,
+        maxPolyphony: 4,
         voice: Tone.FMSynth,
         options: {
           harmonicity: 2,
@@ -1817,7 +1818,7 @@ class AudioEngine {
           modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.3 },
           volume: -8,
         },
-      }).connect(padReverb);
+      }).connect(n.sharedChorus);
       this._musicSynths.push(padSynth);
 
       // Offbeat chord stabs, not sustained pads
@@ -1840,36 +1841,28 @@ class AudioEngine {
       this._musicParts.push(padPart);
     } catch (_) {}
 
-    // Arp: FMSynth stab chords on offbeats
+    // Arp: Simple synth stab on offbeats (reuse arp gain, no extra PolySynth)
     try {
-      const stabSynth = new Tone.PolySynth(Tone.FMSynth, {
-        maxPolyphony: 6,
-        voice: Tone.FMSynth,
-        options: {
-          harmonicity: 2,
-          modulationIndex: 3,
-          envelope: { attack: 0.005, decay: 0.15, sustain: 0.05, release: 0.2 },
-          modulation: { type: 'sine' },
-          modulationEnvelope: { attack: 0.005, decay: 0.1, sustain: 0.05, release: 0.15 },
-          volume: -14,
-        },
+      const arpSynth = new Tone.Synth({
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.005, decay: 0.15, sustain: 0.05, release: 0.2 },
+        volume: -14,
       }).connect(n.arpGain);
-      this._musicSynths.push(stabSynth);
+      this._musicSynths.push(arpSynth);
 
       const stabEvents = [];
       chordNames.forEach((chordName, ci) => {
         const notes = this._getChordNotes(chordName);
         if (!notes) return;
-        // Offbeat stabs
+        // Offbeat stabs - play root note only
         [2, 6, 10, 14].forEach(pos => {
-          stabEvents.push([ci * barLen + this._getSwungTime(pos, swing), chordName]);
+          const letter = notes[0].replace(/[0-9]/g, '');
+          stabEvents.push([ci * barLen + this._getSwungTime(pos, swing), letter + '4']);
         });
       });
-      const stabPart = new Tone.Part((time, chord) => {
-        const notes = this._getChordNotes(chord);
-        if (!notes) return;
+      const stabPart = new Tone.Part((time, note) => {
         if (this._prob(0.8)) {
-          stabSynth.triggerAttackRelease(notes, '32n', time, this._randVel(0.5, 0.2));
+          arpSynth.triggerAttackRelease(note, '32n', time, this._randVel(0.5, 0.2));
         }
       }, stabEvents);
       stabPart.loop = true;
@@ -1918,19 +1911,16 @@ class AudioEngine {
 
     // Bass: Walking bass, sine+triangle feel, portamento
     try {
-      const bassFilter = new Tone.Filter({
-        frequency: this._bassFilterCutoff || 600, type: 'lowpass',
-        Q: this._bassFilterQ || 1,
-      }).connect(n.bassGain);
-      n.bassFilter = bassFilter;
-      this._musicSynths.push(bassFilter);
+      // Configure shared bass filter for deep house
+      n.bassFilter.frequency.rampTo(this._bassFilterCutoff || 600, 0.1);
+      n.bassFilter.Q.rampTo(this._bassFilterQ || 1, 0.1);
 
       const bassSynth = new Tone.MonoSynth({
         oscillator: { type: 'sine' },
         envelope: { attack: 0.02, decay: 0.25, sustain: 0.5, release: 0.4 },
         volume: -6,
         portamento: 0.08,
-      }).connect(bassFilter);
+      }).connect(n.bassFilter);
       this._musicSynths.push(bassSynth);
 
       // Walking bass: step through chord tones
@@ -1959,27 +1949,21 @@ class AudioEngine {
     const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
 
-    // Pad: Sawtooth → AutoFilter (slow sweep) → Reverb
+    // Pad: Sawtooth → shared Reverb
     try {
-      const padReverb = new Tone.Reverb({ decay: 5, wet: 0.35 }).connect(n.padGain);
-      this._musicSynths.push(padReverb);
-
-      const padAutoFilter = new Tone.AutoFilter({
-        frequency: 0.02, depth: 0.8, wet: 0.6,
-        filter: { type: 'lowpass', rolloff: -12 },
-      }).connect(padReverb);
-      padAutoFilter.start();
-      this._musicSynths.push(padAutoFilter);
+      // Configure shared reverb for progressive
+      n.sharedReverb.decay = 5;
+      n.sharedReverb.wet.rampTo(0.35, 0.1);
 
       const padSynth = new Tone.PolySynth(Tone.Synth, {
-        maxPolyphony: 6,
+        maxPolyphony: 4,
         voice: Tone.Synth,
         options: {
           oscillator: { type: 'sawtooth' },
           envelope: { attack: 2, decay: 3, sustain: 0.4, release: 4 },
           volume: -8,
         },
-      }).connect(padAutoFilter);
+      }).connect(n.sharedReverb);
       this._musicSynths.push(padSynth);
 
       const padPart = new Tone.Part((time, chord) => {
@@ -1995,16 +1979,16 @@ class AudioEngine {
 
     // Arp: Sawtooth plucky
     try {
-      const arpDelay = new Tone.FeedbackDelay({
-        delayTime: '8n.', feedback: 0.3, wet: 0.25,
-      }).connect(n.arpGain);
-      this._musicSynths.push(arpDelay);
+      // Configure shared arp delay for progressive
+      n.sharedArpDelay.delayTime.rampTo(Tone.Time('8n.').toSeconds(), 0.1);
+      n.sharedArpDelay.feedback.rampTo(0.3, 0.1);
+      n.sharedArpDelay.wet.rampTo(0.25, 0.1);
 
       const arpSynth = new Tone.Synth({
         oscillator: { type: 'sawtooth' },
         envelope: { attack: 0.005, decay: 0.12, sustain: 0.05, release: 0.2 },
         volume: -12,
-      }).connect(arpDelay);
+      }).connect(n.sharedArpDelay);
       this._musicSynths.push(arpSynth);
 
       const arpEvents = [];
@@ -2067,19 +2051,16 @@ class AudioEngine {
 
     // Bass: Sawtooth through sweeping filter
     try {
-      const bassFilter = new Tone.Filter({
-        frequency: this._bassFilterCutoff || 500, type: 'lowpass',
-        Q: this._bassFilterQ || 3,
-      }).connect(n.bassGain);
-      n.bassFilter = bassFilter;
-      this._musicSynths.push(bassFilter);
+      // Configure shared bass filter for progressive
+      n.bassFilter.frequency.rampTo(this._bassFilterCutoff || 500, 0.1);
+      n.bassFilter.Q.rampTo(this._bassFilterQ || 3, 0.1);
 
       const bassSynth = new Tone.MonoSynth({
         oscillator: { type: 'sawtooth' },
         filter: { type: 'lowpass', frequency: 500, Q: 3 },
         envelope: { attack: 0.02, decay: 0.2, sustain: 0.3, release: 0.3 },
         volume: -8,
-      }).connect(bassFilter);
+      }).connect(n.bassFilter);
       this._musicSynths.push(bassSynth);
 
       const bassEvents = [];
@@ -2122,18 +2103,17 @@ class AudioEngine {
     const chordNames = this._getChords(preset);
     const barLen = Tone.Time('1m').toSeconds();
 
-    // Pad: AMSynth with slow modulation → massive reverb → delay. Almost no dry signal.
+    // Pad: AMSynth with slow modulation → shared reverb → shared delay. Almost no dry signal.
     try {
-      const padDelay = new Tone.FeedbackDelay({
-        delayTime: '4n.', feedback: 0.7, wet: 0.5,
-      }).connect(n.padGain);
-      this._musicSynths.push(padDelay);
-
-      const padReverb = new Tone.Reverb({ decay: 12, wet: 0.9 }).connect(padDelay);
-      this._musicSynths.push(padReverb);
+      // Configure shared effects for ambient techno (massive reverb + delay)
+      n.sharedDelay.delayTime.rampTo(Tone.Time('4n.').toSeconds(), 0.1);
+      n.sharedDelay.feedback.rampTo(0.7, 0.1);
+      n.sharedDelay.wet.rampTo(0.5, 0.1);
+      n.sharedReverb.decay = 12;
+      n.sharedReverb.wet.rampTo(0.9, 0.1);
 
       const padSynth = new Tone.PolySynth(Tone.AMSynth, {
-        maxPolyphony: 6,
+        maxPolyphony: 4,
         voice: Tone.AMSynth,
         options: {
           harmonicity: 1.5,
@@ -2142,7 +2122,7 @@ class AudioEngine {
           modulationEnvelope: { attack: 2, decay: 3, sustain: 0.4, release: 4 },
           volume: -10,
         },
-      }).connect(padReverb);
+      }).connect(n.sharedDelay);
       this._musicSynths.push(padSynth);
 
       const padPart = new Tone.Part((time, chord) => {
@@ -2158,13 +2138,10 @@ class AudioEngine {
 
     // Arp: FMSynth bell-like tones, sparse and random
     try {
-      const arpReverb = new Tone.Reverb({ decay: 8, wet: 0.7 }).connect(n.arpGain);
-      this._musicSynths.push(arpReverb);
-
-      const arpDelay = new Tone.FeedbackDelay({
-        delayTime: '4n', feedback: 0.5, wet: 0.5,
-      }).connect(arpReverb);
-      this._musicSynths.push(arpDelay);
+      // Configure shared arp delay for ambient techno
+      n.sharedArpDelay.delayTime.rampTo(Tone.Time('4n').toSeconds(), 0.1);
+      n.sharedArpDelay.feedback.rampTo(0.5, 0.1);
+      n.sharedArpDelay.wet.rampTo(0.5, 0.1);
 
       const arpSynth = new Tone.FMSynth({
         harmonicity: 3.14,
@@ -2173,7 +2150,7 @@ class AudioEngine {
         modulation: { type: 'sine' },
         modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0.1, release: 1 },
         volume: -16,
-      }).connect(arpDelay);
+      }).connect(n.sharedArpDelay);
       this._musicSynths.push(arpSynth);
 
       // Very sparse: random bell tones every 3-8 seconds
@@ -2215,18 +2192,15 @@ class AudioEngine {
 
     // Bass: Drone-like sine sub
     try {
-      const bassFilter = new Tone.Filter({
-        frequency: this._bassFilterCutoff || 300, type: 'lowpass',
-        Q: this._bassFilterQ || 1,
-      }).connect(n.bassGain);
-      n.bassFilter = bassFilter;
-      this._musicSynths.push(bassFilter);
+      // Configure shared bass filter for ambient techno
+      n.bassFilter.frequency.rampTo(this._bassFilterCutoff || 300, 0.1);
+      n.bassFilter.Q.rampTo(this._bassFilterQ || 1, 0.1);
 
       const bassSynth = new Tone.MonoSynth({
         oscillator: { type: 'sine' },
         envelope: { attack: 1, decay: 2, sustain: 0.8, release: 3 },
         volume: -8,
-      }).connect(bassFilter);
+      }).connect(n.bassFilter);
       this._musicSynths.push(bassSynth);
 
       const bassEvents = [];
@@ -2260,7 +2234,7 @@ class AudioEngine {
       this._musicSynths.push(padDist);
 
       const padSynth = new Tone.PolySynth(Tone.Synth, {
-        maxPolyphony: 6,
+        maxPolyphony: 4,
         voice: Tone.Synth,
         options: {
           oscillator: { type: 'square' },
@@ -2359,19 +2333,19 @@ class AudioEngine {
       const bassDist = new Tone.Distortion({ distortion: 0.6 }).connect(n.bassGain);
       this._musicSynths.push(bassDist);
 
-      const bassFilter = new Tone.Filter({
-        frequency: this._bassFilterCutoff || 1200, type: 'lowpass',
-        Q: this._bassFilterQ || 4,
-      }).connect(bassDist);
-      n.bassFilter = bassFilter;
-      this._musicSynths.push(bassFilter);
+      // Configure shared bass filter for hard techno
+      n.bassFilter.frequency.rampTo(this._bassFilterCutoff || 1200, 0.1);
+      n.bassFilter.Q.rampTo(this._bassFilterQ || 4, 0.1);
+      // Reconnect shared bass filter to distortion for this genre
+      n.bassFilter.disconnect();
+      n.bassFilter.connect(bassDist);
 
       const bassSynth = new Tone.MonoSynth({
         oscillator: { type: 'square' },
         filter: { type: 'lowpass', frequency: 1200, Q: 4 },
         envelope: { attack: 0.005, decay: 0.12, sustain: 0.2, release: 0.15 },
         volume: -6,
-      }).connect(bassFilter);
+      }).connect(n.bassFilter);
       this._musicSynths.push(bassSynth);
 
       const bassEvents = [];
@@ -2405,11 +2379,12 @@ class AudioEngine {
 
     // Basic pad
     try {
-      const padReverb = new Tone.Reverb({ decay: preset.effects.padReverb || 3, wet: 0.3 }).connect(n.padGain);
-      this._musicSynths.push(padReverb);
+      // Configure shared reverb for generic
+      n.sharedReverb.decay = preset.effects.padReverb || 3;
+      n.sharedReverb.wet.rampTo(0.3, 0.1);
 
       const padSynth = new Tone.PolySynth(Tone.Synth, {
-        maxPolyphony: 6,
+        maxPolyphony: 4,
         voice: Tone.Synth,
         options: {
           oscillator: { type: preset.padOsc || 'sine' },
@@ -2419,7 +2394,7 @@ class AudioEngine {
           },
           volume: -6,
         },
-      }).connect(padReverb);
+      }).connect(n.sharedReverb);
       this._musicSynths.push(padSynth);
 
       const padPart = new Tone.Part((time, chord) => {
@@ -2435,17 +2410,16 @@ class AudioEngine {
 
     // Basic arp
     try {
-      const arpDelay = new Tone.FeedbackDelay({
-        delayTime: preset.effects.arpDelay || '16n',
-        feedback: preset.effects.arpDelayFeedback || 0.3, wet: 0.25,
-      }).connect(n.arpGain);
-      this._musicSynths.push(arpDelay);
+      // Configure shared arp delay for generic
+      n.sharedArpDelay.delayTime.rampTo(Tone.Time(preset.effects.arpDelay || '16n').toSeconds(), 0.1);
+      n.sharedArpDelay.feedback.rampTo(preset.effects.arpDelayFeedback || 0.3, 0.1);
+      n.sharedArpDelay.wet.rampTo(0.25, 0.1);
 
       const arpSynth = new Tone.Synth({
         oscillator: { type: preset.arpOsc || 'sine' },
         envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.3 },
         volume: -10,
-      }).connect(arpDelay);
+      }).connect(n.sharedArpDelay);
       this._musicSynths.push(arpSynth);
 
       const arpEvents = [];
@@ -2503,18 +2477,15 @@ class AudioEngine {
 
     // Basic bass
     try {
-      const bassFilter = new Tone.Filter({
-        frequency: this._bassFilterCutoff || 400, type: 'lowpass',
-        Q: this._bassFilterQ || 1,
-      }).connect(n.bassGain);
-      n.bassFilter = bassFilter;
-      this._musicSynths.push(bassFilter);
+      // Configure shared bass filter for generic
+      n.bassFilter.frequency.rampTo(this._bassFilterCutoff || 400, 0.1);
+      n.bassFilter.Q.rampTo(this._bassFilterQ || 1, 0.1);
 
       const bassSynth = new Tone.MonoSynth({
         oscillator: { type: preset.bassOsc || 'sine' },
         envelope: { attack: 0.02, decay: 0.3, sustain: 0.4, release: 0.5 },
         volume: -6,
-      }).connect(bassFilter);
+      }).connect(n.bassFilter);
       this._musicSynths.push(bassSynth);
 
       const bassEvents = [];
@@ -2535,9 +2506,14 @@ class AudioEngine {
   }
 
   _stopMusic() {
-    this._nodes.musicGain.gain.rampTo(0, RAMP);
-    this._nodes.bassGain.gain.rampTo(0, RAMP);
-    this._teardownMusic();
+    const n = this._nodes;
+    n.musicGain.gain.rampTo(0, 0.1);
+    n.arpGain.gain.rampTo(0, 0.05);
+    n.padGain.gain.rampTo(0, 0.05);
+    n.beatGain.gain.rampTo(0, 0.05);
+    n.bassGain.gain.rampTo(0, 0.05);
+    // Don't teardown immediately - let fade happen
+    setTimeout(() => this._teardownMusic(), 200);
   }
 
   /** @param {boolean} enabled */
@@ -2794,6 +2770,7 @@ class AudioEngine {
     dispose(this.fft);
     dispose(this.waveform);
     dispose(this._masterGain);
+    dispose(this._limiter);
 
     this._nodes = {};
     this.initialized = false;
