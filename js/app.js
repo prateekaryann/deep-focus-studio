@@ -99,18 +99,12 @@
         document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
         card.classList.add('active');
         selectedPreset = card.dataset.preset;
+        // Update music suggestion for chosen focus mode
+        if (window._updateMusicSuggestion) window._updateMusicSuggestion();
       });
     });
 
-    // Music preview on mood/preset selection (welcome screen)
-    // When user clicks a mood in welcome preset cards, preview that genre's music
-    document.querySelectorAll('.preset-card[data-preset]').forEach(card => {
-      // The existing click handler selects the preset
-      // Add audio preview: start a short preview of the music
-      card.addEventListener('click', () => {
-        previewMusic(card.dataset.preset);
-      });
-    });
+    // Focus mode no longer auto-selects music — user picks their own.
 
     // Timer mode buttons
     document.querySelectorAll('.timer-preset-btn[data-minutes]').forEach(btn => {
@@ -129,8 +123,6 @@
   }
 
   function beginSession() {
-    // Stop any music preview
-    if (previewTimeout) { clearTimeout(previewTimeout); previewTimeout = null; }
     if (audioEngine && audioEngine.playing) {
       audioEngine.stop();
     }
@@ -169,6 +161,8 @@
       restoreAudioSettings();
       startTimer();
       startVisualizer();
+      if (window._updateMusicSuggestion) window._updateMusicSuggestion();
+      if (window._renderTrackList) window._renderTrackList();
     }).catch(() => {
       // Audio may fail if user hasn't interacted; start timer anyway
       startTimer();
@@ -468,35 +462,93 @@
       });
     });
 
-    // ── Track Player ──
-    (function initTrackPlayer() {
+    // ── Music Player (full media player) ──
+    (function initMusicPlayer() {
       const trackList = document.getElementById('track-list');
       if (!trackList) return;
 
-      const tracks = window.AudioEngine.TRACKS;
       let activeGenre = 'all';
+      let dragSrcIndex = null;
 
-      function renderTracks() {
-        const filtered = activeGenre === 'all' ? tracks : tracks.filter(t => t.genre === activeGenre);
-        const currentId = audioEngine ? audioEngine.getCurrentTrackId() : null;
-        trackList.innerHTML = filtered.map(t => {
-          const isPlaying = t.id === currentId;
-          return '<div class="track-item' + (isPlaying ? ' playing' : '') + '" data-track="' + t.id + '">'
-            + '<button class="track-item-play">' + (isPlaying ? '&#9632;' : '&#9654;') + '</button>'
-            + '<div class="track-item-info">'
-            + '<div class="track-item-name">' + t.name + '</div>'
-            + '<div class="track-item-genre">' + t.genre + '</div>'
-            + '</div></div>';
-        }).join('');
-
-        // Show/hide volume slider
-        const volGroup = document.getElementById('track-vol-group');
-        if (volGroup) volGroup.style.display = currentId ? 'block' : 'none';
+      function getPlaylist() {
+        if (audioEngine && audioEngine.initialized) return audioEngine.getPlaylist();
+        return window.AudioEngine.TRACKS;
       }
 
+      function renderTracks() {
+        const playlist = getPlaylist();
+        const filtered = activeGenre === 'all' ? playlist : playlist.filter(t => t.genre === activeGenre);
+        const currentId = audioEngine ? audioEngine.getCurrentTrackId() : null;
+
+        trackList.innerHTML = filtered.map((t, i) => {
+          const isPlaying = t.id === currentId;
+          const realIdx = playlist.indexOf(t);
+          return '<div class="track-item' + (isPlaying ? ' playing' : '') + '" data-track="' + t.id + '" data-idx="' + realIdx + '" draggable="true">'
+            + '<span class="track-item-drag" title="Drag to reorder">&#x2630;</span>'
+            + '<button class="track-item-play">' + (isPlaying ? '&#9632;' : '&#9654;') + '</button>'
+            + '<div class="track-item-info">'
+            + '<div class="track-item-name">' + escapeHtml(t.name) + '</div>'
+            + '<div class="track-item-genre">' + t.genre + '</div>'
+            + '</div>'
+            + (t.isCustom ? '<button class="track-item-remove" data-remove="' + t.id + '" title="Remove">&times;</button>' : '')
+            + '</div>';
+        }).join('');
+
+        // Volume slider visibility
+        const volGroup = document.getElementById('track-vol-group');
+        if (volGroup) volGroup.style.display = currentId ? 'block' : 'none';
+
+        // Now playing bar
+        updateNowPlaying(currentId);
+
+        // Play/pause button state
+        const playBtn = document.getElementById('btn-track-play');
+        if (playBtn) {
+          playBtn.classList.toggle('playing', !!currentId);
+        }
+      }
+
+      function updateNowPlaying(trackId) {
+        const el = document.getElementById('now-playing');
+        if (!el) return;
+        if (!trackId) { el.style.display = 'none'; return; }
+        const playlist = getPlaylist();
+        const track = playlist.find(t => t.id === trackId);
+        if (!track) { el.style.display = 'none'; return; }
+        el.style.display = 'flex';
+        const titleEl = document.getElementById('now-playing-title');
+        const genreEl = document.getElementById('now-playing-genre');
+        if (titleEl) titleEl.textContent = track.name;
+        if (genreEl) genreEl.textContent = track.genre;
+      }
+
+      // Show neuroscience suggestion based on focus mode
+      function updateMusicSuggestion() {
+        const el = document.getElementById('music-suggestion');
+        const textEl = document.getElementById('music-suggestion-text');
+        if (!el || !textEl) return;
+        const preset = selectedPreset || 'deep-work';
+        const suggestions = window.AudioEngine.MUSIC_SUGGESTIONS;
+        if (suggestions && suggestions[preset]) {
+          textEl.textContent = suggestions[preset].tip;
+          el.style.display = 'flex';
+        } else {
+          el.style.display = 'none';
+        }
+      }
+
+      // Track list click handler (play/stop + remove)
       trackList.addEventListener('click', function(e) {
+        // Remove button
+        const removeBtn = e.target.closest('[data-remove]');
+        if (removeBtn && audioEngine) {
+          audioEngine.removeCustomTrack(removeBtn.dataset.remove);
+          renderTracks();
+          return;
+        }
+        // Play/stop
         const item = e.target.closest('.track-item');
-        if (!item || !audioEngine) return;
+        if (!item || !audioEngine || e.target.closest('.track-item-drag')) return;
         const trackId = item.dataset.track;
         if (audioEngine.getCurrentTrackId() === trackId) {
           audioEngine.stopTrack();
@@ -506,6 +558,41 @@
         renderTracks();
       });
 
+      // Drag & drop reorder
+      trackList.addEventListener('dragstart', function(e) {
+        const item = e.target.closest('.track-item');
+        if (!item) return;
+        dragSrcIndex = parseInt(item.dataset.idx);
+        item.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      trackList.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        const item = e.target.closest('.track-item');
+        if (item) item.classList.add('drag-over');
+      });
+      trackList.addEventListener('dragleave', function(e) {
+        const item = e.target.closest('.track-item');
+        if (item) item.classList.remove('drag-over');
+      });
+      trackList.addEventListener('drop', function(e) {
+        e.preventDefault();
+        const item = e.target.closest('.track-item');
+        if (!item || !audioEngine) return;
+        item.classList.remove('drag-over');
+        const toIndex = parseInt(item.dataset.idx);
+        if (dragSrcIndex !== null && dragSrcIndex !== toIndex) {
+          audioEngine.moveTrack(dragSrcIndex, toIndex);
+          renderTracks();
+        }
+        dragSrcIndex = null;
+      });
+      trackList.addEventListener('dragend', function() {
+        trackList.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+        dragSrcIndex = null;
+      });
+
+      // Genre filter tabs
       document.querySelectorAll('.track-genre-tab').forEach(tab => {
         tab.addEventListener('click', () => {
           document.querySelectorAll('.track-genre-tab').forEach(t => t.classList.remove('active'));
@@ -515,15 +602,85 @@
         });
       });
 
+      // Transport: Play/Pause
+      const btnPlay = document.getElementById('btn-track-play');
+      if (btnPlay) btnPlay.addEventListener('click', () => {
+        if (!audioEngine) return;
+        if (audioEngine.getCurrentTrackId()) {
+          audioEngine.stopTrack();
+        } else {
+          // Play first track in playlist
+          const playlist = getPlaylist();
+          if (playlist.length > 0) audioEngine.playTrack(playlist[0].id);
+        }
+        renderTracks();
+      });
+
+      // Transport: Next
+      const btnNext = document.getElementById('btn-next');
+      if (btnNext) btnNext.addEventListener('click', () => {
+        if (audioEngine) { audioEngine.playNext(); renderTracks(); }
+      });
+
+      // Transport: Previous
+      const btnPrev = document.getElementById('btn-prev');
+      if (btnPrev) btnPrev.addEventListener('click', () => {
+        if (audioEngine) { audioEngine.playPrev(); renderTracks(); }
+      });
+
+      // Transport: Shuffle
+      const btnShuffle = document.getElementById('btn-shuffle');
+      if (btnShuffle) btnShuffle.addEventListener('click', () => {
+        if (!audioEngine) return;
+        const shuffled = audioEngine.toggleShuffle();
+        btnShuffle.classList.toggle('active', shuffled);
+        showToast(shuffled ? 'Shuffle on' : 'Shuffle off');
+      });
+
+      // Transport: Loop
+      const btnLoop = document.getElementById('btn-loop');
+      if (btnLoop) btnLoop.addEventListener('click', () => {
+        if (!audioEngine) return;
+        const mode = audioEngine.cycleLoopMode();
+        btnLoop.className = 'player-btn player-btn-sm';
+        if (mode === 'all') { btnLoop.classList.add('loop-all'); showToast('Loop all'); }
+        else if (mode === 'one') { btnLoop.classList.add('loop-one'); showToast('Loop one'); }
+        else { showToast('Loop off'); }
+      });
+
+      // Add custom tracks
+      const btnAdd = document.getElementById('btn-add-track');
+      const fileInput = document.getElementById('track-file-input');
+      if (btnAdd && fileInput) {
+        btnAdd.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+          if (!audioEngine || !fileInput.files.length) return;
+          for (const file of fileInput.files) {
+            audioEngine.addCustomTrack(file);
+          }
+          // Switch to custom genre tab
+          document.querySelectorAll('.track-genre-tab').forEach(t => t.classList.remove('active'));
+          const customTab = document.querySelector('.track-genre-tab[data-genre="custom"]');
+          if (customTab) customTab.classList.add('active');
+          activeGenre = 'custom';
+          renderTracks();
+          showToast(fileInput.files.length + ' track(s) added');
+          fileInput.value = '';
+        });
+      }
+
+      // Track volume
       wireSlider('track-vol', v => {
         if (audioEngine) audioEngine.setTrackVolume(v / 100);
       });
 
       // Initial render
       renderTracks();
+      updateMusicSuggestion();
 
-      // Re-render when track loads (slight delay for async load)
+      // Expose for external updates
       window._renderTrackList = renderTracks;
+      window._updateMusicSuggestion = updateMusicSuggestion;
     })();
 
     // Bass volume
@@ -1443,12 +1600,15 @@
 
     renderTasks();
 
+    selectedPreset = session.preset || 'deep-work';
     audioEngine.init().then(() => {
       audioEngine.start();
       if (session.preset) audioEngine.applyPreset(session.preset);
       restoreAudioSettings();
       startTimer();
       startVisualizer();
+      if (window._updateMusicSuggestion) window._updateMusicSuggestion();
+      if (window._renderTrackList) window._renderTrackList();
     }).catch(() => {
       startTimer();
     });

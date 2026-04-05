@@ -2684,14 +2684,13 @@ class AudioEngine {
     ];
   }
 
-  /** Apply a full audio configuration preset. @param {string} name */
+  /** Apply a focus mode preset — sets neural & soundscape only; music is user's choice. */
   applyPreset(name) {
-    // Disable everything first
+    // Reset neural & soundscape layers only — leave music untouched
     this.setBinauralEnabled(false);
     this.setNoiseEnabled(false);
     this.setDroneEnabled(false);
     this.setNatureEnabled(false);
-    this.setMusicEnabled(false);
 
     switch (name) {
       case 'deep-work':
@@ -2708,11 +2707,6 @@ class AudioEngine {
         this.setNatureType('rain');
         this.setNatureVolume(0.4);
         this.setNatureEnabled(true);
-        this.setMusicPreset('ambienttechno');
-        this.setPadVolume(0.2);
-        this.setArpVolume(0.15);
-        this.setBeatVolume(0);
-        this.setMusicEnabled(true);
         break;
       case 'study':
         this.setBinauralFrequency(18);
@@ -2721,11 +2715,6 @@ class AudioEngine {
         this.setNatureType('cafe');
         this.setNatureVolume(0.3);
         this.setNatureEnabled(true);
-        this.setMusicPreset('deephouse');
-        this.setPadVolume(0.25);
-        this.setArpVolume(0.2);
-        this.setBeatVolume(0.15);
-        this.setMusicEnabled(true);
         break;
       case 'meditation':
         this.setBinauralFrequency(6);
@@ -2741,14 +2730,38 @@ class AudioEngine {
         this.setBinauralFrequency(40);
         this.setBinauralVolume(0.4);
         this.setBinauralEnabled(true);
-        this.setMusicPreset('hardtechno');
-        this.setPadVolume(0.4);
-        this.setArpVolume(0.35);
-        this.setBeatVolume(0.3);
-        this.setMusicEnabled(true);
         break;
     }
   }
+
+  /** Neuroscience-backed music suggestions per focus mode */
+  static MUSIC_SUGGESTIONS = {
+    'deep-work': {
+      tip: 'Research shows repetitive, low-complexity music at 50-80 BPM supports sustained attention (Gonzalez & Aiello, 2019).',
+      synth: ['minimal', 'dubtechno', 'ambienttechno'],
+      trackGenres: ['ambient', 'lofi']
+    },
+    'creative': {
+      tip: 'Moderate ambient noise (~70dB) boosts abstract thinking. Alpha-range music with moderate novelty works best (Mehta et al., 2012).',
+      synth: ['ambienttechno', 'progressive', 'dubtechno'],
+      trackGenres: ['ambient', 'lofi']
+    },
+    'study': {
+      tip: 'Familiar, lyric-free music reduces cognitive load during learning. Lo-fi and cafe sounds are backed by research (Perham & Currie, 2014).',
+      synth: ['deephouse', 'minimal'],
+      trackGenres: ['lofi', 'ambient']
+    },
+    'meditation': {
+      tip: 'Slow tempo (40-60 BPM) with minimal harmonic movement activates the parasympathetic nervous system.',
+      synth: ['ambienttechno', 'dubtechno'],
+      trackGenres: ['ambient']
+    },
+    'energy': {
+      tip: 'Fast-tempo music (120-150 BPM) increases arousal, heart rate, and dopamine for high-intensity tasks (Karageorghis et al., 2009).',
+      synth: ['hardtechno', 'detroit', 'trance', 'dnb'],
+      trackGenres: ['techno', 'edm']
+    }
+  };
 
   // ───────── TRACK PLAYER (Pre-recorded music) ─────────
 
@@ -2774,12 +2787,19 @@ class AudioEngine {
     this._trackEnabled = false;
     this._trackVolume = 0.6;
     this._currentTrackId = null;
+    // Playlist state
+    this._playlist = [...AudioEngine.TRACKS]; // working playlist (can include custom tracks)
+    this._playlistOrder = this._playlist.map((_, i) => i); // index order (shuffled or sequential)
+    this._playlistPos = -1; // current position in _playlistOrder
+    this._loopMode = 'none'; // 'none' | 'all' | 'one'
+    this._shuffled = false;
+    this._customTracks = []; // user-added tracks via file input
   }
 
-  /** Load and play a pre-recorded track by id. Loops automatically. */
+  /** Load and play a track by id. Advances to next track on end (unless looping). */
   async playTrack(trackId) {
     if (!this.initialized) return;
-    const track = AudioEngine.TRACKS.find(t => t.id === trackId);
+    const track = this._playlist.find(t => t.id === trackId);
     if (!track) return;
 
     // Stop current track if any
@@ -2788,10 +2808,17 @@ class AudioEngine {
     this._currentTrackId = trackId;
     this._trackEnabled = true;
 
+    // Update playlist position
+    const idx = this._playlist.indexOf(track);
+    this._playlistPos = this._playlistOrder.indexOf(idx);
+    if (this._playlistPos === -1) this._playlistPos = 0;
+
+    const shouldLoop = (this._loopMode === 'one');
+
     try {
       this._trackPlayer = new Tone.Player({
         url: track.file,
-        loop: true,
+        loop: shouldLoop,
         fadeIn: 0.5,
         fadeOut: 0.5,
         onload: () => {
@@ -2799,6 +2826,13 @@ class AudioEngine {
             this._trackPlayerGain.gain.rampTo(this._trackVolume, 0.3);
             this._trackPlayer.start();
             if (window._renderTrackList) window._renderTrackList();
+            // Auto-advance when track ends (if not looping single)
+            if (!shouldLoop && this._trackPlayer.buffer && this._trackPlayer.buffer.duration) {
+              const dur = this._trackPlayer.buffer.duration;
+              this._trackEndTimer = setTimeout(() => {
+                if (this._currentTrackId === trackId) this.playNext();
+              }, dur * 1000 + 200);
+            }
           }
         },
         onerror: () => {
@@ -2811,6 +2845,7 @@ class AudioEngine {
   }
 
   _stopTrack() {
+    if (this._trackEndTimer) { clearTimeout(this._trackEndTimer); this._trackEndTimer = null; }
     if (this._trackPlayer) {
       this._trackPlayerGain.gain.rampTo(0, 0.3);
       const player = this._trackPlayer;
@@ -2844,6 +2879,115 @@ class AudioEngine {
   /** @returns {boolean} Whether a track is currently playing */
   isTrackPlaying() {
     return this._trackEnabled && this._trackPlayer !== null;
+  }
+
+  // ───────── PLAYLIST MANAGEMENT ─────────
+
+  /** Get the full playlist (built-in + custom) */
+  getPlaylist() { return this._playlist; }
+
+  /** Get current loop mode */
+  getLoopMode() { return this._loopMode; }
+
+  /** Cycle loop mode: none → all → one → none */
+  cycleLoopMode() {
+    const modes = ['none', 'all', 'one'];
+    this._loopMode = modes[(modes.indexOf(this._loopMode) + 1) % 3];
+    // Update current player loop behavior
+    if (this._trackPlayer) {
+      this._trackPlayer.loop = (this._loopMode === 'one');
+    }
+    return this._loopMode;
+  }
+
+  /** @returns {boolean} shuffle state */
+  isShuffled() { return this._shuffled; }
+
+  /** Toggle shuffle on/off */
+  toggleShuffle() {
+    this._shuffled = !this._shuffled;
+    this._rebuildPlaylistOrder();
+    return this._shuffled;
+  }
+
+  _rebuildPlaylistOrder() {
+    const currentId = this._currentTrackId;
+    if (this._shuffled) {
+      // Fisher-Yates shuffle
+      this._playlistOrder = this._playlist.map((_, i) => i);
+      for (let i = this._playlistOrder.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [this._playlistOrder[i], this._playlistOrder[j]] = [this._playlistOrder[j], this._playlistOrder[i]];
+      }
+    } else {
+      this._playlistOrder = this._playlist.map((_, i) => i);
+    }
+    // Restore position to current track
+    if (currentId) {
+      const idx = this._playlist.findIndex(t => t.id === currentId);
+      this._playlistPos = this._playlistOrder.indexOf(idx);
+    }
+  }
+
+  /** Play next track in playlist */
+  playNext() {
+    if (this._playlist.length === 0) return;
+    if (this._loopMode === 'one' && this._currentTrackId) {
+      // Restart same track
+      this.playTrack(this._currentTrackId);
+      return;
+    }
+    this._playlistPos++;
+    if (this._playlistPos >= this._playlistOrder.length) {
+      if (this._loopMode === 'all') {
+        this._playlistPos = 0;
+      } else {
+        this._stopTrack();
+        if (window._renderTrackList) window._renderTrackList();
+        return;
+      }
+    }
+    const track = this._playlist[this._playlistOrder[this._playlistPos]];
+    if (track) this.playTrack(track.id);
+  }
+
+  /** Play previous track in playlist */
+  playPrev() {
+    if (this._playlist.length === 0) return;
+    this._playlistPos--;
+    if (this._playlistPos < 0) {
+      this._playlistPos = this._loopMode === 'all' ? this._playlistOrder.length - 1 : 0;
+    }
+    const track = this._playlist[this._playlistOrder[this._playlistPos]];
+    if (track) this.playTrack(track.id);
+  }
+
+  /** Add a custom track from a File object (user upload). Returns the track metadata. */
+  addCustomTrack(file) {
+    const url = URL.createObjectURL(file);
+    const name = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+    const id = 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+    const track = { id, name, genre: 'custom', file: url, isCustom: true };
+    this._customTracks.push(track);
+    this._playlist.push(track);
+    this._rebuildPlaylistOrder();
+    return track;
+  }
+
+  /** Remove a custom track by id */
+  removeCustomTrack(trackId) {
+    if (this._currentTrackId === trackId) this._stopTrack();
+    this._customTracks = this._customTracks.filter(t => t.id !== trackId);
+    this._playlist = this._playlist.filter(t => t.id !== trackId);
+    this._rebuildPlaylistOrder();
+  }
+
+  /** Move a track in the playlist */
+  moveTrack(fromIndex, toIndex) {
+    if (fromIndex === toIndex) return;
+    const [item] = this._playlist.splice(fromIndex, 1);
+    this._playlist.splice(toIndex, 0, item);
+    this._rebuildPlaylistOrder();
   }
 
   // ───────── DISPOSE ─────────
