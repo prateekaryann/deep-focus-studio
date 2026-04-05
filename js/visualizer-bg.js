@@ -99,8 +99,9 @@
 
       gl_Position = projectionMatrix * mvPosition;
 
-      float distFade = clamp(1.0 - length(mvPosition.xyz) / 70.0, 0.05, 1.0);
-      vAlpha = (0.5 + aActive * 0.5) * distFade;
+      float distFade = clamp(1.0 - length(mvPosition.xyz) / 80.0, 0.1, 1.0);
+      // Higher base alpha + stronger active boost for more visible particles
+      vAlpha = (0.6 + aActive * 0.4) * distFade;
       vActive = aActive;
       vBeatFlash = uBeatFlash;
       vDist = length(pos) / 20.0;
@@ -118,6 +119,7 @@
     uniform float uHighs;
     uniform float uBeatFlash;
     uniform float uColorCycle;
+    uniform float uTime;
 
     void main() {
       vec2 uv = gl_PointCoord - vec2(0.5);
@@ -125,30 +127,36 @@
 
       if (dist > 0.5) discard;
 
-      // Sharp core with glow halo
-      float core = 1.0 - smoothstep(0.0, 0.12, dist);
-      float ring = smoothstep(0.5, 0.15, dist) * 0.5;
-      float outerGlow = smoothstep(0.5, 0.3, dist) * 0.15 * vBeatFlash;
-      float alpha = core + ring + outerGlow;
+      // Enhanced glow: bright core + soft halo + wide outer glow
+      float core = 1.0 - smoothstep(0.0, 0.08, dist);
+      float innerGlow = smoothstep(0.5, 0.1, dist) * 0.6;
+      float outerGlow = smoothstep(0.5, 0.2, dist) * 0.25;
+      float beatGlow = smoothstep(0.5, 0.15, dist) * vBeatFlash * 0.4;
+      float alpha = core + innerGlow + outerGlow + beatGlow;
 
-      float brightness = 0.6 + uHighs * 0.25 + vActive * 0.5;
+      // Breathing brightness — particles slowly pulse even without audio
+      float breathe = 0.08 * sin(uTime * 0.8 + vDist * 6.0);
+      float brightness = 0.65 + breathe + uHighs * 0.3 + vActive * 0.6;
 
-      // Color mixing: base -> beat color on beats, with distance-based variation
+      // Color mixing: base -> beat color on beats
       vec3 baseCol = uColor * brightness;
-      vec3 beatCol = uBeatColor * (brightness + 0.3);
+      vec3 beatCol = uBeatColor * (brightness + 0.4);
 
-      // Blend toward beat color based on flash intensity and particle activity
-      float beatMix = vBeatFlash * vActive * 0.8;
+      // Blend toward beat color — more responsive
+      float beatMix = clamp(vBeatFlash * (0.5 + vActive * 0.5), 0.0, 1.0);
       vec3 col = mix(baseCol, beatCol, beatMix);
 
-      // Add subtle rainbow shift based on distance from center
-      float hueShift = vDist * uColorCycle * 0.3;
-      col.r += sin(hueShift) * 0.08 * vActive;
-      col.g += sin(hueShift + 2.094) * 0.08 * vActive;
-      col.b += sin(hueShift + 4.189) * 0.08 * vActive;
+      // Distance-based hue shift for depth
+      float hueShift = vDist * uColorCycle * 0.4 + uTime * 0.1;
+      col.r += sin(hueShift) * 0.1 * (0.3 + vActive * 0.7);
+      col.g += sin(hueShift + 2.094) * 0.1 * (0.3 + vActive * 0.7);
+      col.b += sin(hueShift + 4.189) * 0.1 * (0.3 + vActive * 0.7);
 
       // Hot white core on strong beats
-      col = mix(col, vec3(1.0), core * vBeatFlash * 0.4);
+      col = mix(col, vec3(1.0), core * vBeatFlash * 0.5);
+
+      // Soft luminance boost for active particles
+      col += vec3(0.05) * vActive * innerGlow;
 
       gl_FragColor = vec4(col, alpha * vAlpha);
     }
@@ -191,6 +199,10 @@
       this._currentBeatColorIdx = 0;
       this._beatColor = new Float32Array([1, 0.4, 0.1]);
       this._targetBeatColor = new Float32Array([1, 0.4, 0.1]);
+
+      // Smooth theme color lerping
+      this._currentColor = new Float32Array(this.theme.primary);
+      this._targetColor = new Float32Array(this.theme.primary);
 
       // Formation morphing
       this._formationTimer = 0;
@@ -414,7 +426,7 @@
       const ringMat = new THREE.MeshBasicMaterial({
         color: new THREE.Color(col[0], col[1], col[2]),
         transparent: true,
-        opacity: 0.0,
+        opacity: 0.04,
         side: THREE.DoubleSide,
         blending: THREE.AdditiveBlending,
       });
@@ -469,8 +481,8 @@
       const lPos = this.lines.geometry.attributes.position.array;
       const lCol = this.lines.geometry.attributes.color.array;
 
-      // Mix base color with beat color
-      const col = this.theme.primary;
+      // Mix smooth-lerped color with beat color
+      const col = this._currentColor;
       const bc = this._beatColor;
       const beatMix = this._beatFlash * 0.5;
       const r = col[0] * (1 - beatMix) + bc[0] * beatMix;
@@ -542,9 +554,10 @@
         const val = Math.max(0, Math.min(1, rawVal));
         const current = active[i];
         if (val > current) {
-          active[i] = current + (val - current) * 0.6;
+          active[i] = current + (val - current) * 0.5;
         } else {
-          active[i] = current * 0.92;
+          // Slower decay — particles glow longer, more cinematic fade
+          active[i] = current * 0.96;
         }
       }
       this._activeAttr.needsUpdate = true;
@@ -572,8 +585,8 @@
         }
       }
 
-      // Decay flash
-      this._beatFlash *= 0.88;
+      // Decay flash — slower for more dramatic glow
+      this._beatFlash *= 0.92;
       if (this._beatFlash < 0.01) this._beatFlash = 0;
 
       // Lerp beat color
@@ -677,18 +690,10 @@
 
       const col = this.theme.primary;
       const sec = this.theme.secondary;
-      this._particleUniforms.uColor.value.set(
-        col[0] * 0.7 + sec[0] * 0.3,
-        col[1] * 0.7 + sec[1] * 0.3,
-        col[2] * 0.7 + sec[2] * 0.3
-      );
-
-      if (this.centralMesh) {
-        this.centralMesh.material.color.setRGB(col[0], col[1], col[2]);
-      }
-      if (this.auraRing) {
-        this.auraRing.material.color.setRGB(col[0], col[1], col[2]);
-      }
+      // Set target — actual color lerps smoothly in _animate
+      this._targetColor[0] = col[0] * 0.7 + sec[0] * 0.3;
+      this._targetColor[1] = col[1] * 0.7 + sec[1] * 0.3;
+      this._targetColor[2] = col[2] * 0.7 + sec[2] * 0.3;
     }
 
     setGenre(genreName) {
@@ -751,6 +756,19 @@
       this._randomFormationSwitch(dt);
       this._updateCentralGeoMorph(dt);
 
+      // Smooth theme color lerp — the key fix for sphere color transitions
+      const cc = this._currentColor;
+      const tc = this._targetColor;
+      const colorLerp = 0.025; // smooth, visible transition
+      cc[0] += (tc[0] - cc[0]) * colorLerp;
+      cc[1] += (tc[1] - cc[1]) * colorLerp;
+      cc[2] += (tc[2] - cc[2]) * colorLerp;
+
+      // Ambient color breathing — sphere gently shifts hue over time
+      const breathR = cc[0] + Math.sin(elapsed * 0.15) * 0.06;
+      const breathG = cc[1] + Math.sin(elapsed * 0.15 + 2.094) * 0.06;
+      const breathB = cc[2] + Math.sin(elapsed * 0.15 + 4.189) * 0.06;
+
       // Update uniforms
       this._particleUniforms.uTime.value = elapsed;
       this._particleUniforms.uBass.value = this.bass;
@@ -758,6 +776,7 @@
       this._particleUniforms.uHighs.value = this.highs;
       this._particleUniforms.uBeatFlash.value = this._beatFlash;
       this._particleUniforms.uColorCycle.value = this._colorCycleTime;
+      this._particleUniforms.uColor.value.set(breathR, breathG, breathB);
       this._particleUniforms.uBeatColor.value.set(
         this._beatColor[0], this._beatColor[1], this._beatColor[2]
       );
@@ -771,33 +790,31 @@
         const cScale = 1.0 + this.bass * this.profile.pulseStrength * 0.6;
         this.centralMesh.scale.setScalar(cScale);
 
-        // Beat-reactive color on central mesh
-        const col = this.theme.primary;
+        // Smooth color: lerped theme + beat reactive + breathing
         const bc = this._beatColor;
         const bm = this._beatFlash * 0.6;
         this.centralMesh.material.color.setRGB(
-          col[0] * (1 - bm) + bc[0] * bm,
-          col[1] * (1 - bm) + bc[1] * bm,
-          col[2] * (1 - bm) + bc[2] * bm
+          breathR * (1 - bm) + bc[0] * bm,
+          breathG * (1 - bm) + bc[1] * bm,
+          breathB * (1 - bm) + bc[2] * bm
         );
-        this.centralMesh.material.opacity = 0.15 + this._beatFlash * 0.25;
+        this.centralMesh.material.opacity = 0.18 + energy * 0.15 + this._beatFlash * 0.3;
       }
 
-      // Aura ring - pulses on bass
+      // Aura ring - pulses on bass, color synced
       if (this.auraRing) {
         this.auraRing.rotation.x = Math.PI / 2 + Math.sin(elapsed * 0.3) * 0.2;
         this.auraRing.rotation.z = elapsed * 0.1;
         const auraScale = 1.0 + this.bass * 0.8 + this._beatFlash * 0.5;
         this.auraRing.scale.setScalar(auraScale);
-        this.auraRing.material.opacity = this.bass * 0.12 + this._beatFlash * 0.15;
+        this.auraRing.material.opacity = 0.04 + this.bass * 0.15 + this._beatFlash * 0.2;
 
-        const col = this.theme.primary;
         const bc = this._beatColor;
         const bm = this._beatFlash * 0.7;
         this.auraRing.material.color.setRGB(
-          col[0] * (1 - bm) + bc[0] * bm,
-          col[1] * (1 - bm) + bc[1] * bm,
-          col[2] * (1 - bm) + bc[2] * bm
+          breathR * (1 - bm) + bc[0] * bm,
+          breathG * (1 - bm) + bc[1] * bm,
+          breathB * (1 - bm) + bc[2] * bm
         );
       }
 
