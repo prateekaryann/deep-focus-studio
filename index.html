@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deep Focus Studio</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-tertiary: #1a1a25;
+      --text-primary: #e8e8ec;
+      --text-secondary: #9090a0;
+      --text-muted: #606070;
+      --accent: #6366f1;
+      --accent-dim: #4f46e5;
+      --success: #10b981;
+      --border: #2a2a3a;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+    
+    h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+    
+    /* Timer Section */
+    .timer-section {
+      background: var(--bg-secondary);
+      border-radius: 20px;
+      padding: 2.5rem;
+      text-align: center;
+      margin-bottom: 2rem;
+      border: 1px solid var(--border);
+    }
+    
+    .timer-display {
+      font-size: 5rem;
+      font-weight: 300;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -2px;
+      margin-bottom: 1.5rem;
+      color: var(--text-primary);
+    }
+    
+    .timer-display span {
+      opacity: 0.4;
+    }
+    
+    .timer-controls {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .btn {
+      padding: 12px 32px;
+      font-size: 1rem;
+      font-weight: 500;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: var(--accent-dim);
+      transform: translateY(-1px);
+    }
+    
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+    
+    .btn-secondary:hover {
+      background: var(--border);
+      color: var(--text-primary);
+    }
+    
+    .session-stats {
+      display: flex;
+      justify-content: center;
+      gap: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    
+    .stat {
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    /* Audio Sections */
+    .audio-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    
+    .audio-card {
+      background: var(--bg-secondary);
+      border-radius: 16px;
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+    }
+    
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+    
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .card-icon {
+      width: 20px;
+      height: 20px;
+      opacity: 0.7;
+    }
+    
+    .toggle-btn {
+      width: 48px;
+      height: 28px;
+      border-radius: 14px;
+      border: none;
+      background: var(--bg-tertiary);
+      cursor: pointer;
+      position: relative;
+      transition: background 0.3s;
+    }
+    
+    .toggle-btn.active {
+      background: var(--success);
+    }
+    
+    .toggle-btn::after {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: white;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.3s;
+    }
+    
+    .toggle-btn.active::after {
+      transform: translateX(20px);
+    }
+    
+    /* Brain State Buttons */
+    .brain-states {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 1rem;
+    }
+    
+    .state-btn {
+      padding: 10px 12px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s;
+      color: var(--text-primary);
+    }
+    
+    .state-btn:hover {
+      border-color: var(--accent);
+    }
+    
+    .state-btn.active {
+      background: rgba(99, 102, 241, 0.15);
+      border-color: var(--accent);
+    }
+    
+    .state-btn .freq {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .state-btn .desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    
+    /* Sliders */
+    .slider-group {
+      margin-bottom: 1rem;
+    }
+    
+    .slider-group:last-child {
+      margin-bottom: 0;
+    }
+    
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    
+    .slider-value {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+    
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--bg-tertiary);
+      outline: none;
+      -webkit-appearance: none;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+    
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: none;
+    }
+    
+    /* EDM Controls */
+    .edm-presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 1rem;
+    }
+    
+    .preset-btn {
+      padding: 8px 16px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+    
+    .preset-btn:hover {
+      border-color: var(--accent);
+      color: var(--text-primary);
+    }
+    
+    .preset-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+    
+    /* Master Controls */
+    .master-section {
+      background: var(--bg-secondary);
+      border-radius: 16px;
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+    }
+    
+    .master-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    
+    .master-title {
+      font-weight: 600;
+    }
+    
+    .master-btn {
+      padding: 14px 36px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      background: var(--accent);
+      color: white;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .master-btn:hover {
+      background: var(--accent-dim);
+      transform: translateY(-1px);
+    }
+    
+    .master-btn.playing {
+      background: var(--success);
+    }
+    
+    /* Visualizer */
+    .visualizer {
+      height: 60px;
+      background: var(--bg-tertiary);
+      border-radius: 12px;
+      margin-top: 1rem;
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 3px;
+      padding: 10px;
+    }
+    
+    .viz-bar {
+      width: 4px;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: height 0.1s ease;
+      opacity: 0.7;
+    }
+    
+    /* Headphones notice */
+    .notice {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: rgba(99, 102, 241, 0.1);
+      border-radius: 10px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-top: 1rem;
+    }
+    
+    /* Responsive */
+    @media (max-width: 600px) {
+      .timer-display {
+        font-size: 3.5rem;
+      }
+      
+      .session-stats {
+        gap: 1.5rem;
+      }
+      
+      .brain-states {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Deep Focus Studio</h1>
+      <p class="subtitle">Neuroscience-backed sounds for deep work</p>
+    </header>
+    
+    <!-- Timer Section -->
+    <section class="timer-section">
+      <div class="timer-display" id="timerDisplay">
+        00<span>:</span>00<span>:</span>00
+      </div>
+      <div class="timer-controls">
+        <button class="btn btn-primary" id="timerToggle">Start Focus</button>
+        <button class="btn btn-secondary" id="timerReset">Reset</button>
+      </div>
+      <div class="session-stats">
+        <div class="stat">
+          <div class="stat-value" id="sessionsCount">0</div>
+          <div class="stat-label">Sessions today</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="totalTime">0h 0m</div>
+          <div class="stat-label">Total focus time</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="currentStreak">0</div>
+          <div class="stat-label">Day streak</div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Audio Controls Grid -->
+    <div class="audio-grid">
+      <!-- Binaural Beats -->
+      <div class="audio-card">
+        <div class="card-header">
+          <span class="card-title">
+            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+            Binaural beats
+          </span>
+          <button class="toggle-btn active" id="binauralToggle"></button>
+        </div>
+        <div class="brain-states">
+          <button class="state-btn" data-freq="6">
+            <div class="freq">θ Theta · 6 Hz</div>
+            <div class="desc">Creative flow</div>
+          </button>
+          <button class="state-btn active" data-freq="10">
+            <div class="freq">α Alpha · 10 Hz</div>
+            <div class="desc">Relaxed focus</div>
+          </button>
+          <button class="state-btn" data-freq="18">
+            <div class="freq">β Beta · 18 Hz</div>
+            <div class="desc">Active thinking</div>
+          </button>
+          <button class="state-btn" data-freq="40">
+            <div class="freq">γ Gamma · 40 Hz</div>
+            <div class="desc">Peak cognition</div>
+          </button>
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Volume</span>
+            <span class="slider-value" id="binauralVolVal">30%</span>
+          </div>
+          <input type="range" id="binauralVol" min="0" max="100" value="30">
+        </div>
+      </div>
+      
+      <!-- Noise Textures -->
+      <div class="audio-card">
+        <div class="card-header">
+          <span class="card-title">
+            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M2 12h4l3-9 3 18 3-9h4"/>
+            </svg>
+            Noise textures
+          </span>
+          <button class="toggle-btn active" id="noiseToggle"></button>
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Brown noise</span>
+            <span class="slider-value" id="brownVolVal">40%</span>
+          </div>
+          <input type="range" id="brownVol" min="0" max="100" value="40">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Pink noise</span>
+            <span class="slider-value" id="pinkVolVal">0%</span>
+          </div>
+          <input type="range" id="pinkVol" min="0" max="100" value="0">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>White noise</span>
+            <span class="slider-value" id="whiteVolVal">0%</span>
+          </div>
+          <input type="range" id="whiteVol" min="0" max="100" value="0">
+        </div>
+      </div>
+      
+      <!-- Ambient Drone -->
+      <div class="audio-card">
+        <div class="card-header">
+          <span class="card-title">
+            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            </svg>
+            Ambient drone
+          </span>
+          <button class="toggle-btn" id="droneToggle"></button>
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Volume</span>
+            <span class="slider-value" id="droneVolVal">25%</span>
+          </div>
+          <input type="range" id="droneVol" min="0" max="100" value="25">
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 8px;">
+          Low harmonic tones for grounding
+        </p>
+      </div>
+      
+      <!-- Chill EDM -->
+      <div class="audio-card">
+        <div class="card-header">
+          <span class="card-title">
+            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18V5l12-2v13"/>
+              <circle cx="6" cy="18" r="3"/>
+              <circle cx="18" cy="16" r="3"/>
+            </svg>
+            Chill EDM
+          </span>
+          <button class="toggle-btn" id="edmToggle"></button>
+        </div>
+        <div class="edm-presets">
+          <button class="preset-btn active" data-preset="ambient">Ambient</button>
+          <button class="preset-btn" data-preset="lofi">Lo-fi</button>
+          <button class="preset-btn" data-preset="deep">Deep house</button>
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Arpeggio</span>
+            <span class="slider-value" id="arpVolVal">35%</span>
+          </div>
+          <input type="range" id="arpVol" min="0" max="100" value="35">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Pad</span>
+            <span class="slider-value" id="padVolVal">40%</span>
+          </div>
+          <input type="range" id="padVol" min="0" max="100" value="40">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Beat</span>
+            <span class="slider-value" id="beatVolVal">0%</span>
+          </div>
+          <input type="range" id="beatVol" min="0" max="100" value="0">
+        </div>
+      </div>
+    </div>
+    
+    <!-- Master Controls -->
+    <section class="master-section">
+      <div class="master-header">
+        <span class="master-title">Master output</span>
+        <div style="display: flex; align-items: center; gap: 16px; flex: 1; max-width: 300px; margin: 0 24px;">
+          <span style="font-size: 0.85rem; color: var(--text-muted);">Vol</span>
+          <input type="range" id="masterVol" min="0" max="100" value="70" style="flex: 1;">
+          <span class="slider-value" id="masterVolVal" style="min-width: 40px;">70%</span>
+        </div>
+        <button class="master-btn" id="masterPlay">
+          <span id="playIcon">▶</span>
+          <span id="playText">Start session</span>
+        </button>
+      </div>
+      <div class="visualizer" id="visualizer"></div>
+      <div class="notice">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+        </svg>
+        Headphones recommended for binaural beats to work properly
+      </div>
+    </section>
+  </div>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+  <script>
+    // ==================== TIMER ====================
+    let timerRunning = false;
+    let timerSeconds = 0;
+    let timerInterval = null;
+    let sessionsToday = parseInt(localStorage.getItem('focusSessions') || '0');
+    let totalMinutes = parseInt(localStorage.getItem('focusMinutes') || '0');
+    let lastSessionDate = localStorage.getItem('lastSessionDate') || '';
+    let streak = parseInt(localStorage.getItem('focusStreak') || '0');
+    
+    const today = new Date().toDateString();
+    if (lastSessionDate !== today) {
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      if (lastSessionDate !== yesterday) {
+        streak = 0;
+      }
+      sessionsToday = 0;
+    }
+    
+    function updateTimerDisplay() {
+      const h = Math.floor(timerSeconds / 3600);
+      const m = Math.floor((timerSeconds % 3600) / 60);
+      const s = timerSeconds % 60;
+      document.getElementById('timerDisplay').innerHTML = 
+        `${String(h).padStart(2, '0')}<span>:</span>${String(m).padStart(2, '0')}<span>:</span>${String(s).padStart(2, '0')}`;
+    }
+    
+    function updateStats() {
+      document.getElementById('sessionsCount').textContent = sessionsToday;
+      const hours = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      document.getElementById('totalTime').textContent = `${hours}h ${mins}m`;
+      document.getElementById('currentStreak').textContent = streak;
+    }
+    
+    document.getElementById('timerToggle').onclick = () => {
+      const btn = document.getElementById('timerToggle');
+      if (!timerRunning) {
+        timerRunning = true;
+        btn.textContent = 'Pause';
+        timerInterval = setInterval(() => {
+          timerSeconds++;
+          updateTimerDisplay();
+        }, 1000);
+      } else {
+        timerRunning = false;
+        btn.textContent = 'Resume';
+        clearInterval(timerInterval);
+      }
+    };
+    
+    document.getElementById('timerReset').onclick = () => {
+      if (timerSeconds >= 60) {
+        sessionsToday++;
+        totalMinutes += Math.floor(timerSeconds / 60);
+        if (lastSessionDate !== today) {
+          streak++;
+        }
+        lastSessionDate = today;
+        localStorage.setItem('focusSessions', sessionsToday);
+        localStorage.setItem('focusMinutes', totalMinutes);
+        localStorage.setItem('lastSessionDate', lastSessionDate);
+        localStorage.setItem('focusStreak', streak);
+        updateStats();
+      }
+      timerRunning = false;
+      timerSeconds = 0;
+      clearInterval(timerInterval);
+      document.getElementById('timerToggle').textContent = 'Start Focus';
+      updateTimerDisplay();
+    };
+    
+    updateStats();
+    
+    // ==================== AUDIO ENGINE ====================
+    let audioInitialized = false;
+    let isPlaying = false;
+    
+    // Audio nodes
+    let masterGain;
+    let binauralEnabled = true, noiseEnabled = true, droneEnabled = false, edmEnabled = false;
+    let binauralFreq = 10;
+    let edmPreset = 'ambient';
+    
+    // Binaural
+    let oscL, oscR, binauralGainL, binauralGainR, panL, panR;
+    
+    // Noise
+    let brownNoise, pinkNoise, whiteNoise, brownGain, pinkGain, whiteGain;
+    
+    // Drone
+    let droneOscs = [], droneGain, droneFilter;
+    
+    // EDM
+    let arpSynth, padSynth, kick, hihat, arpGain, padGain, beatGain;
+    let arpPattern, beatPattern;
+    
+    // Chord progressions for EDM
+    const chordProgressions = {
+      ambient: [
+        ['C4', 'E4', 'G4', 'B4'],
+        ['A3', 'C4', 'E4', 'G4'],
+        ['F3', 'A3', 'C4', 'E4'],
+        ['G3', 'B3', 'D4', 'F4']
+      ],
+      lofi: [
+        ['D4', 'F4', 'A4', 'C5'],
+        ['G3', 'B3', 'D4', 'F4'],
+        ['C4', 'E4', 'G4', 'B4'],
+        ['A3', 'C4', 'E4', 'G4']
+      ],
+      deep: [
+        ['A3', 'C4', 'E4'],
+        ['F3', 'A3', 'C4'],
+        ['D3', 'F3', 'A3'],
+        ['E3', 'G3', 'B3']
+      ]
+    };
+    
+    async function initAudio() {
+      await Tone.start();
+      Tone.Transport.bpm.value = edmPreset === 'deep' ? 120 : 85;
+      
+      masterGain = new Tone.Gain(0.7).toDestination();
+      
+      // Binaural setup
+      binauralGainL = new Tone.Gain(0.15).connect(masterGain);
+      binauralGainR = new Tone.Gain(0.15).connect(masterGain);
+      panL = new Tone.Panner(-1).connect(binauralGainL);
+      panR = new Tone.Panner(1).connect(binauralGainR);
+      oscL = new Tone.Oscillator(200, 'sine').connect(panL);
+      oscR = new Tone.Oscillator(200 + binauralFreq, 'sine').connect(panR);
+      
+      // Noise setup
+      brownGain = new Tone.Gain(0.12).connect(masterGain);
+      pinkGain = new Tone.Gain(0).connect(masterGain);
+      whiteGain = new Tone.Gain(0).connect(masterGain);
+      brownNoise = new Tone.Noise('brown').connect(brownGain);
+      pinkNoise = new Tone.Noise('pink').connect(pinkGain);
+      whiteNoise = new Tone.Noise('white').connect(whiteGain);
+      
+      // Drone setup
+      droneGain = new Tone.Gain(0.04).connect(masterGain);
+      droneFilter = new Tone.Filter(300, 'lowpass').connect(droneGain);
+      [55, 82.5, 110, 165].forEach(f => {
+        const osc = new Tone.Oscillator(f, 'sine').connect(droneFilter);
+        droneOscs.push(osc);
+      });
+      
+      // EDM setup
+      arpGain = new Tone.Gain(0.07).connect(masterGain);
+      padGain = new Tone.Gain(0.08).connect(masterGain);
+      beatGain = new Tone.Gain(0).connect(masterGain);
+      
+      const arpReverb = new Tone.Reverb({ decay: 4, wet: 0.5 }).connect(arpGain);
+      const arpDelay = new Tone.PingPongDelay('8n', 0.3).connect(arpReverb);
+      arpSynth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.02, decay: 0.3, sustain: 0.2, release: 0.8 }
+      }).connect(arpDelay);
+      arpSynth.volume.value = -6;
+      
+      const padReverb = new Tone.Reverb({ decay: 6, wet: 0.6 }).connect(padGain);
+      padSynth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sine' },
+        envelope: { attack: 1.5, decay: 2, sustain: 0.8, release: 3 }
+      }).connect(padReverb);
+      padSynth.volume.value = -8;
+      
+      kick = new Tone.MembraneSynth({
+        pitchDecay: 0.05,
+        octaves: 4,
+        envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.5 }
+      }).connect(beatGain);
+      kick.volume.value = -4;
+      
+      hihat = new Tone.MetalSynth({
+        frequency: 200,
+        envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4000,
+        octaves: 1.5
+      }).connect(beatGain);
+      hihat.volume.value = -20;
+      
+      // Arp pattern
+      let chordIndex = 0;
+      let noteIndex = 0;
+      arpPattern = new Tone.Loop(time => {
+        if (!edmEnabled) return;
+        const chords = chordProgressions[edmPreset];
+        const chord = chords[chordIndex % chords.length];
+        const note = chord[noteIndex % chord.length];
+        arpSynth.triggerAttackRelease(note, '8n', time);
+        noteIndex++;
+        if (noteIndex >= chord.length * 2) {
+          noteIndex = 0;
+          chordIndex++;
+        }
+      }, '8n');
+      
+      // Pad chord changes
+      let padChordIndex = 0;
+      new Tone.Loop(time => {
+        if (!edmEnabled) return;
+        const chords = chordProgressions[edmPreset];
+        const chord = chords[padChordIndex % chords.length];
+        padSynth.triggerAttackRelease(chord, '2n', time);
+        padChordIndex++;
+      }, '2n').start(0);
+      
+      // Beat pattern
+      beatPattern = new Tone.Loop(time => {
+        if (!edmEnabled) return;
+        kick.triggerAttackRelease('C1', '8n', time);
+      }, '4n');
+      
+      new Tone.Loop(time => {
+        if (!edmEnabled) return;
+        hihat.triggerAttackRelease('16n', time, 0.3);
+      }, '8n').start('8n');
+      
+      audioInitialized = true;
+    }
+    
+    function startAllAudio() {
+      if (binauralEnabled) {
+        oscL.start();
+        oscR.start();
+      }
+      if (noiseEnabled) {
+        brownNoise.start();
+        pinkNoise.start();
+        whiteNoise.start();
+      }
+      if (droneEnabled) {
+        droneOscs.forEach(o => o.start());
+      }
+      if (edmEnabled) {
+        arpPattern.start(0);
+        beatPattern.start(0);
+        Tone.Transport.start();
+      }
+    }
+    
+    function stopAllAudio() {
+      oscL.stop();
+      oscR.stop();
+      brownNoise.stop();
+      pinkNoise.stop();
+      whiteNoise.stop();
+      droneOscs.forEach(o => o.stop());
+      arpPattern.stop();
+      beatPattern.stop();
+      Tone.Transport.stop();
+    }
+    
+    // ==================== VISUALIZER ====================
+    const vizContainer = document.getElementById('visualizer');
+    const barCount = 40;
+    for (let i = 0; i < barCount; i++) {
+      const bar = document.createElement('div');
+      bar.className = 'viz-bar';
+      bar.style.height = '4px';
+      vizContainer.appendChild(bar);
+    }
+    const vizBars = document.querySelectorAll('.viz-bar');
+    
+    function animateVisualizer() {
+      if (!isPlaying) {
+        vizBars.forEach(bar => bar.style.height = '4px');
+        return;
+      }
+      vizBars.forEach((bar, i) => {
+        const base = 10;
+        const variation = Math.sin(Date.now() / 500 + i * 0.3) * 15;
+        const random = Math.random() * 10;
+        bar.style.height = `${base + variation + random}px`;
+      });
+      requestAnimationFrame(animateVisualizer);
+    }
+    
+    // ==================== UI CONTROLS ====================
+    
+    // Master play button
+    document.getElementById('masterPlay').onclick = async () => {
+      if (!audioInitialized) {
+        await initAudio();
+      }
+      
+      const btn = document.getElementById('masterPlay');
+      const icon = document.getElementById('playIcon');
+      const text = document.getElementById('playText');
+      
+      if (!isPlaying) {
+        startAllAudio();
+        isPlaying = true;
+        btn.classList.add('playing');
+        icon.textContent = '⏸';
+        text.textContent = 'Pause';
+        animateVisualizer();
+      } else {
+        stopAllAudio();
+        isPlaying = false;
+        btn.classList.remove('playing');
+        icon.textContent = '▶';
+        text.textContent = 'Start session';
+      }
+    };
+    
+    // Toggle buttons
+    function setupToggle(id, callback) {
+      document.getElementById(id).onclick = function() {
+        this.classList.toggle('active');
+        callback(this.classList.contains('active'));
+      };
+    }
+    
+    setupToggle('binauralToggle', enabled => {
+      binauralEnabled = enabled;
+      if (audioInitialized && isPlaying) {
+        if (enabled) { oscL.start(); oscR.start(); }
+        else { oscL.stop(); oscR.stop(); }
+      }
+    });
+    
+    setupToggle('noiseToggle', enabled => {
+      noiseEnabled = enabled;
+      if (audioInitialized && isPlaying) {
+        if (enabled) { brownNoise.start(); pinkNoise.start(); whiteNoise.start(); }
+        else { brownNoise.stop(); pinkNoise.stop(); whiteNoise.stop(); }
+      }
+    });
+    
+    setupToggle('droneToggle', enabled => {
+      droneEnabled = enabled;
+      if (audioInitialized && isPlaying) {
+        droneOscs.forEach(o => enabled ? o.start() : o.stop());
+      }
+    });
+    
+    setupToggle('edmToggle', enabled => {
+      edmEnabled = enabled;
+      if (audioInitialized && isPlaying) {
+        if (enabled) {
+          arpPattern.start(0);
+          beatPattern.start(0);
+          Tone.Transport.start();
+        } else {
+          arpPattern.stop();
+          beatPattern.stop();
+        }
+      }
+    });
+    
+    // Brain state buttons
+    document.querySelectorAll('.state-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        binauralFreq = parseInt(btn.dataset.freq);
+        if (audioInitialized) {
+          oscR.frequency.value = 200 + binauralFreq;
+        }
+      };
+    });
+    
+    // EDM presets
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        edmPreset = btn.dataset.preset;
+        if (audioInitialized) {
+          Tone.Transport.bpm.value = edmPreset === 'deep' ? 120 : 85;
+        }
+      };
+    });
+    
+    // Sliders
+    function setupSlider(sliderId, valId, callback) {
+      const slider = document.getElementById(sliderId);
+      const val = document.getElementById(valId);
+      slider.oninput = () => {
+        const v = parseInt(slider.value);
+        val.textContent = v + '%';
+        callback(v);
+      };
+    }
+    
+    setupSlider('binauralVol', 'binauralVolVal', v => {
+      if (audioInitialized) {
+        const gain = (v / 100) * 0.5;
+        binauralGainL.gain.value = gain;
+        binauralGainR.gain.value = gain;
+      }
+    });
+    
+    setupSlider('brownVol', 'brownVolVal', v => {
+      if (audioInitialized) brownGain.gain.value = (v / 100) * 0.3;
+    });
+    
+    setupSlider('pinkVol', 'pinkVolVal', v => {
+      if (audioInitialized) pinkGain.gain.value = (v / 100) * 0.25;
+    });
+    
+    setupSlider('whiteVol', 'whiteVolVal', v => {
+      if (audioInitialized) whiteGain.gain.value = (v / 100) * 0.15;
+    });
+    
+    setupSlider('droneVol', 'droneVolVal', v => {
+      if (audioInitialized) droneGain.gain.value = (v / 100) * 0.15;
+    });
+    
+    setupSlider('arpVol', 'arpVolVal', v => {
+      if (audioInitialized) arpGain.gain.value = (v / 100) * 0.2;
+    });
+    
+    setupSlider('padVol', 'padVolVal', v => {
+      if (audioInitialized) padGain.gain.value = (v / 100) * 0.2;
+    });
+    
+    setupSlider('beatVol', 'beatVolVal', v => {
+      if (audioInitialized) beatGain.gain.value = (v / 100) * 0.25;
+    });
+    
+    setupSlider('masterVol', 'masterVolVal', v => {
+      if (audioInitialized) masterGain.gain.value = v / 100;
+    });
+  </script>
+</body>
+</html>
