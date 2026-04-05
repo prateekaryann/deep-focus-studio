@@ -365,8 +365,11 @@ class AudioEngine {
 
   _startBinaural() {
     const n = this._nodes;
-    n.binOscL.frequency.value = this._binauralBaseFreq;
-    n.binOscR.frequency.value = this._binauralBaseFreq + this._binauralFreq;
+    // Dispose and recreate oscillators so they can be toggled on/off repeatedly
+    try { n.binOscL.stop(); n.binOscL.dispose(); } catch (_) {}
+    try { n.binOscR.stop(); n.binOscR.dispose(); } catch (_) {}
+    n.binOscL = new Tone.Oscillator(this._binauralBaseFreq, 'sine').connect(n.binPanL);
+    n.binOscR = new Tone.Oscillator(this._binauralBaseFreq + this._binauralFreq, 'sine').connect(n.binPanR);
     n.binOscL.start();
     n.binOscR.start();
     n.binGainL.gain.rampTo(this._binauralVolume, RAMP);
@@ -419,6 +422,13 @@ class AudioEngine {
 
   _startNoise() {
     const n = this._nodes;
+    // Dispose and recreate noise sources so they can be toggled on/off repeatedly
+    try { n.brownNoise.stop(); n.brownNoise.dispose(); } catch (_) {}
+    try { n.pinkNoise.stop(); n.pinkNoise.dispose(); } catch (_) {}
+    try { n.whiteNoise.stop(); n.whiteNoise.dispose(); } catch (_) {}
+    n.brownNoise = new Tone.Noise('brown').connect(n.brownGain);
+    n.pinkNoise  = new Tone.Noise('pink').connect(n.pinkGain);
+    n.whiteNoise = new Tone.Noise('white').connect(n.whiteGain);
     n.brownNoise.start();
     n.pinkNoise.start();
     n.whiteNoise.start();
@@ -475,8 +485,14 @@ class AudioEngine {
   }
 
   _startDrone() {
-    this._nodes.droneOscs.forEach(o => o.start());
-    this._nodes.droneGain.gain.rampTo(this._droneVolume, RAMP);
+    const n = this._nodes;
+    // Dispose and recreate drone oscillators so they can be toggled on/off repeatedly
+    if (n.droneOscs) {
+      n.droneOscs.forEach(o => { try { o.stop(); o.dispose(); } catch (_) {} });
+    }
+    n.droneOscs = [55, 82.5, 110, 165].map(f => new Tone.Oscillator(f, 'sine').connect(n.droneFilter));
+    n.droneOscs.forEach(o => o.start());
+    n.droneGain.gain.rampTo(this._droneVolume, RAMP);
   }
 
   _stopDrone() {
@@ -2963,11 +2979,20 @@ class AudioEngine {
   }
 
   /** Add a custom track from a File object (user upload). Returns the track metadata. */
-  addCustomTrack(file) {
+  addCustomTrack(file, genre) {
     const url = URL.createObjectURL(file);
     const name = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
     const id = 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
-    const track = { id, name, genre: 'custom', file: url, isCustom: true };
+    const track = { id, name, genre: genre || 'custom', file: url, isCustom: true };
+    this._customTracks.push(track);
+    this._playlist.push(track);
+    this._rebuildPlaylistOrder();
+    return track;
+  }
+
+  /** Restore a custom track from a pre-built blob URL (e.g. from IndexedDB). */
+  restoreCustomTrack(id, name, genre, url) {
+    const track = { id, name, genre: genre || 'custom', file: url, isCustom: true };
     this._customTracks.push(track);
     this._playlist.push(track);
     this._rebuildPlaylistOrder();

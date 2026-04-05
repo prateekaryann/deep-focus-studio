@@ -7,6 +7,7 @@
    1. CSS Variables / Design Tokens
    ------------------------------------------------------- */
 :root {
+  --genre-bg: 10, 10, 25;
   --bg-primary: #06060b;
   --bg-secondary: rgba(12, 12, 20, 0.4);
   --bg-tertiary: rgba(20, 20, 35, 0.3);
@@ -100,6 +101,29 @@ button:active { transition: none !important; }
   background: linear-gradient(135deg, #06060b 0%, #0f0a1e 25%, #0a0e1f 50%, #100a20 75%, #06060b 100%);
   background-size: 400% 400%;
   animation: bgShift 30s ease infinite;
+  transition: background 4s ease;
+}
+
+/* Genre-reactive background overlay — updates via CSS var set by JS */
+.bg-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%,
+    rgba(var(--genre-bg), 0.22) 0%,
+    rgba(var(--genre-bg), 0.08) 45%,
+    transparent 70%);
+  transition: background 3s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* More vivid overlay on focus screen */
+body:has(#screen-focus.active) .bg-canvas::before {
+  background: radial-gradient(ellipse at 50% 50%,
+    rgba(var(--genre-bg), 0.35) 0%,
+    rgba(var(--genre-bg), 0.15) 50%,
+    transparent 72%);
 }
 
 .bg-canvas canvas {
@@ -240,6 +264,130 @@ button:active { transition: none !important; }
   color: #fff;
   border-color: var(--accent);
 }
+
+/* Welcome screen section label hint */
+.section-label-opt {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 0.4rem;
+  text-transform: none;
+}
+
+/* Welcome track picker — genre tabs */
+.welcome-track-genres {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.welcome-genre-tab {
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.welcome-genre-tab:hover { color: var(--text-primary); border-color: var(--accent); }
+
+.welcome-genre-tab.active {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Welcome track list */
+.welcome-track-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 1.5rem;
+  padding-right: 2px;
+}
+
+.welcome-track-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.welcome-track-item:hover {
+  color: var(--text-primary);
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.07);
+}
+
+.welcome-track-item.active {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.welcome-track-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.welcome-track-genre-badge {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Neural / binaural preset — collapsible on welcome screen */
+.welcome-preset-details {
+  margin-bottom: 1.5rem;
+}
+
+.welcome-preset-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  list-style: none;
+  padding: 0.3rem 0;
+  user-select: none;
+}
+
+.welcome-preset-summary::-webkit-details-marker { display: none; }
+
+.welcome-preset-summary:hover { color: var(--text-secondary); }
+
+.welcome-preset-details[open] .welcome-preset-summary { color: var(--text-secondary); }
+
+/* Smaller preset cards inside the collapsed section */
+.welcome-preset-details .preset-card {
+  padding: 0.6rem 0.75rem;
+}
+
+.welcome-preset-details .preset-name { font-size: 0.82rem; }
+.welcome-preset-details .preset-desc { font-size: 0.72rem; }
 
 /* Begin button */
 .btn-begin {
@@ -1132,6 +1280,38 @@ input[type="range"]::-moz-range-track {
   overflow-y: auto;
 }
 
+/* Upload genre modal */
+.upload-genre-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+.upload-genre-btn {
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.15s;
+}
+.upload-genre-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+.upload-genre-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.upload-genre-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
 /* Toast */
 .toast {
   position: fixed;
@@ -1961,25 +2141,25 @@ button:focus-visible,
 
 /* Theme variants */
 .theme-theta .bg-canvas {
-  background: linear-gradient(135deg, #06060b 0%, #0a1520 25%, #081018 50%, #0a1520 75%, #06060b 100%);
+  background: linear-gradient(135deg, #060810 0%, #0a1828 25%, #06101c 50%, #0a1828 75%, #060810 100%);
   background-size: 400% 400%;
   animation: bgShift 30s ease infinite;
 }
 
 .theme-alpha .bg-canvas {
-  background: linear-gradient(135deg, #06060b 0%, #0f0a1e 25%, #0a0e1f 50%, #100a20 75%, #06060b 100%);
+  background: linear-gradient(135deg, #06060e 0%, #100c22 25%, #0a0e24 50%, #120c26 75%, #06060e 100%);
   background-size: 400% 400%;
   animation: bgShift 30s ease infinite;
 }
 
 .theme-beta .bg-canvas {
-  background: linear-gradient(135deg, #06060b 0%, #1a0f0a 25%, #0f1a0a 50%, #1a100a 75%, #06060b 100%);
+  background: linear-gradient(135deg, #070608 0%, #1c0e08 25%, #0e1808 50%, #1c0e08 75%, #070608 100%);
   background-size: 400% 400%;
   animation: bgShift 30s ease infinite;
 }
 
 .theme-gamma .bg-canvas {
-  background: linear-gradient(135deg, #06060b 0%, #1a0a1a 25%, #200a18 50%, #1a0a1a 75%, #06060b 100%);
+  background: linear-gradient(135deg, #060608 0%, #1c081c 25%, #22081a 50%, #1c081c 75%, #060608 100%);
   background-size: 400% 400%;
   animation: bgShift 30s ease infinite;
 }
@@ -2203,36 +2383,66 @@ button:focus-visible,
 }
 
 .focus-timer-float .timer-display {
-  font-size: 6rem;
-  font-weight: 200;
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  font-size: 6.5rem;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -3px;
-  color: rgba(232, 232, 236, 0.9);
-  text-shadow: 0 0 60px rgba(99, 102, 241, 0.2), 0 0 120px rgba(99, 102, 241, 0.1);
+  letter-spacing: 0.05em;
+  /* Layered glow: cyan core → indigo halo — matches the particle/tunnel palette */
+  color: rgba(200, 240, 255, 0.92);
+  text-shadow:
+    0 0 8px  rgba(0, 210, 255, 0.9),
+    0 0 20px rgba(0, 180, 255, 0.6),
+    0 0 50px rgba(60, 120, 255, 0.35),
+    0 0 100px rgba(99, 102, 241, 0.2);
   line-height: 1;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
+  /* Subtle scanline flicker suggestion */
+  animation: timerPulse 4s ease-in-out infinite;
+}
+
+@keyframes timerPulse {
+  0%, 100% { opacity: 0.92; text-shadow: 0 0 8px rgba(0,210,255,0.9), 0 0 20px rgba(0,180,255,0.6), 0 0 50px rgba(60,120,255,0.35), 0 0 100px rgba(99,102,241,0.2); }
+  50%       { opacity: 1;    text-shadow: 0 0 12px rgba(0,220,255,1),   0 0 30px rgba(0,200,255,0.8), 0 0 70px rgba(60,140,255,0.45), 0 0 140px rgba(99,102,241,0.3); }
+}
+
+/* Wall-clock mode: larger single display */
+.focus-timer-float.clock-mode .timer-display {
+  font-size: 7.5rem;
+  letter-spacing: 0.08em;
+  color: rgba(180, 235, 255, 0.88);
+}
+
+/* Elapsed mode: slightly dimmer to differentiate */
+.focus-timer-float.elapsed-mode .timer-display {
+  color: rgba(160, 215, 255, 0.75);
+  text-shadow:
+    0 0 6px  rgba(0, 180, 220, 0.7),
+    0 0 18px rgba(0, 150, 200, 0.5),
+    0 0 50px rgba(60, 100, 220, 0.25);
 }
 
 .focus-timer-float .timer-mode-badge {
   display: inline-block;
   padding: 0.3rem 1rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: rgba(15, 15, 25, 0.4);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: rgba(0, 210, 255, 0.7);
+  background: rgba(0, 20, 40, 0.5);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-radius: 20px;
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(0, 180, 255, 0.2);
   margin-bottom: 1rem;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
 }
 
 .focus-timer-float .timer-progress-track {
-  width: 200px;
-  height: 3px;
-  background: rgba(255,255,255,0.06);
+  width: 220px;
+  height: 2px;
+  background: rgba(0, 180, 255, 0.1);
   border-radius: 2px;
   margin: 0 auto;
   overflow: hidden;
@@ -2240,9 +2450,37 @@ button:focus-visible,
 
 .focus-timer-float .timer-progress {
   height: 100%;
-  background: var(--accent);
+  background: linear-gradient(90deg, rgba(0,180,255,0.6), rgba(99,102,241,0.8));
   border-radius: 2px;
   transition: width 1s linear;
+  box-shadow: 0 0 8px rgba(0, 200, 255, 0.6);
+}
+
+/* Format toggle button */
+.timer-format-btn {
+  pointer-events: all;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  padding: 0.3rem 0.85rem;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.55rem;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  color: rgba(0, 200, 255, 0.5);
+  background: rgba(0, 20, 40, 0.35);
+  border: 1px solid rgba(0, 180, 255, 0.15);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.timer-format-btn:hover {
+  color: rgba(0, 220, 255, 0.9);
+  border-color: rgba(0, 200, 255, 0.4);
+  background: rgba(0, 30, 60, 0.55);
 }
 
 /* Bottom action bar */
@@ -2863,6 +3101,17 @@ button:focus-visible,
   color: var(--text-primary);
 }
 
+#btn-mic-viz.mic-active {
+  color: #f87171;
+  border-color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+  animation: micPulse 1.4s ease-in-out infinite;
+}
+@keyframes micPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(248, 113, 113, 0); }
+}
+
 /* When focus screen is active, hide the old elements */
 #screen-focus .audio-grid,
 #screen-focus .master-section,
@@ -2874,7 +3123,9 @@ button:focus-visible,
 /* Responsive */
 @media (max-width: 640px) {
   .focus-timer-float .timer-display {
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
     font-size: 3.5rem;
+    letter-spacing: 0.03em;
   }
 
   .focus-action-bar {
@@ -3244,4 +3495,72 @@ button:focus-visible,
 
   .stats-overview .stat-card .value { color: #000; }
   .stats-overview .stat-card .label { color: #666; }
+}
+
+/* -------------------------------------------------------
+   Sound Panel Tabs
+   ------------------------------------------------------- */
+.panel-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem 0;
+  background: rgba(10, 10, 20, 0.5);
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-tab {
+  flex: 1;
+  padding: 0.45rem 0.25rem;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+  text-align: center;
+}
+
+.panel-tab:hover { color: var(--text-primary); }
+
+.panel-tab.active {
+  color: var(--text-primary);
+  background: rgba(99, 102, 241, 0.12);
+  border-color: var(--border);
+  border-bottom-color: transparent;
+}
+
+/* Tab content visibility — only active pane shown */
+.panel-tab-content { display: none; }
+.panel-tab-content.active { display: block; }
+
+/* -------------------------------------------------------
+   Audio Resume Banner (shown after reload when autoplay is blocked)
+   ------------------------------------------------------- */
+.audio-resume-banner {
+  position: absolute;
+  bottom: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.4rem;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 999px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  z-index: 200;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: toastIn 0.4s ease forwards;
+  white-space: nowrap;
+}
+.audio-resume-banner:hover {
+  background: rgba(99, 102, 241, 0.28);
+  border-color: var(--accent);
 }

@@ -12,12 +12,68 @@
   let vizAnimFrame = null;
   let breathingTimeout = null;
   let vizBG = null;
+  let micAnalyser = null;
+  let micVizActive = false;
   let selectedPreset = null;
   let selectedTimerMinutes = 25;
   let pomodoroCount = 0;
   let pomodoroOnBreak = false;
   let isMuted = false;
   let preMuteVolume = 50;
+  let selectedTrackId = null; // track selected on welcome screen to play on loop
+
+  // ─── IndexedDB: Custom Track Persistence ────────────────────────────
+
+  const DB_NAME = 'deep-focus-custom-tracks';
+  const DB_STORE = 'tracks';
+  let _db = null;
+
+  function openTracksDB() {
+    if (_db) return Promise.resolve(_db);
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = e => {
+        e.target.result.createObjectStore(DB_STORE, { keyPath: 'id' });
+      };
+      req.onsuccess = e => { _db = e.target.result; resolve(_db); };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function saveCustomTrackToDB(file, id, name, genre) {
+    try {
+      const db = await openTracksDB();
+      const buf = await file.arrayBuffer();
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      tx.objectStore(DB_STORE).put({ id, name, genre, type: file.type, buf });
+    } catch (e) { console.warn('Could not save track to DB', e); }
+  }
+
+  async function deleteCustomTrackFromDB(id) {
+    try {
+      const db = await openTracksDB();
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      tx.objectStore(DB_STORE).delete(id);
+    } catch (e) { console.warn('Could not delete track from DB', e); }
+  }
+
+  async function restoreCustomTracksFromDB() {
+    try {
+      const db = await openTracksDB();
+      const tx = db.transaction(DB_STORE, 'readonly');
+      const records = await new Promise((res, rej) => {
+        const req = tx.objectStore(DB_STORE).getAll();
+        req.onsuccess = () => res(req.result);
+        req.onerror = () => rej(req.error);
+      });
+      for (const r of records) {
+        const blob = new Blob([r.buf], { type: r.type || 'audio/mpeg' });
+        const url = URL.createObjectURL(blob);
+        if (audioEngine) audioEngine.restoreCustomTrack(r.id, r.name, r.genre, url);
+      }
+      if (records.length && window._renderTrackList) window._renderTrackList();
+    } catch (e) { console.warn('Could not restore tracks from DB', e); }
+  }
 
   // ─── Toast Notification System ──────────────────────────────────────
 
@@ -104,7 +160,52 @@
       });
     });
 
-    // Focus mode no longer auto-selects music — user picks their own.
+    // Welcome screen track list
+    (function initWelcomeTrackPicker() {
+      const listEl = document.getElementById('welcome-track-list');
+      const genreTabsEl = document.getElementById('welcome-genre-tabs');
+      if (!listEl) return;
+
+      let activeGenre = 'all';
+
+      function renderWelcomeTracks() {
+        const tracks = window.AudioEngine ? window.AudioEngine.TRACKS : [];
+        const filtered = activeGenre === 'all' ? tracks : tracks.filter(t => t.genre === activeGenre);
+
+        // "None" item + track items
+        const noneActive = selectedTrackId === null ? ' active' : '';
+        listEl.innerHTML = '<button class="welcome-track-item' + noneActive + '" data-track-id="">'
+          + '<span class="welcome-track-name">None</span>'
+          + '</button>'
+          + filtered.map(t => {
+            const isActive = t.id === selectedTrackId ? ' active' : '';
+            return '<button class="welcome-track-item' + isActive + '" data-track-id="' + t.id + '">'
+              + '<span class="welcome-track-name">' + escapeHtml(t.name) + '</span>'
+              + '<span class="welcome-track-genre-badge">' + t.genre + '</span>'
+              + '</button>';
+          }).join('');
+
+        listEl.querySelectorAll('.welcome-track-item').forEach(btn => {
+          btn.addEventListener('click', () => {
+            selectedTrackId = btn.dataset.trackId || null;
+            renderWelcomeTracks();
+          });
+        });
+      }
+
+      if (genreTabsEl) {
+        genreTabsEl.querySelectorAll('.welcome-genre-tab').forEach(tab => {
+          tab.addEventListener('click', () => {
+            genreTabsEl.querySelectorAll('.welcome-genre-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            activeGenre = tab.dataset.genre;
+            renderWelcomeTracks();
+          });
+        });
+      }
+
+      renderWelcomeTracks();
+    })();
 
     // Timer mode buttons
     document.querySelectorAll('.timer-preset-btn[data-minutes]').forEach(btn => {
@@ -128,7 +229,7 @@
     }
 
     const goal = (document.getElementById('goal-input')?.value || '').trim();
-    const preset = selectedPreset || 'deep-work';
+    const preset = selectedPreset || null;
     const duration = selectedTimerMinutes;
     const timerMode = duration === 0 ? 'free' : (duration === 25 ? 'pomodoro' : 'countdown');
 
@@ -157,7 +258,27 @@
   function startAudioAndTimer(preset) {
     audioEngine.init().then(() => {
       audioEngine.start();
-      if (preset) audioEngine.applyPreset(preset);
+      // Apply neural/soundscape preset only when user explicitly chose one
+      // and didn't pick a track (track = clean music, no surprise binaural/noise on top)
+      if (preset && !selectedTrackId) {
+        audioEngine.applyPreset(preset);
+      } else {
+        // Silence all layers — nothing unexpected should play
+        audioEngine.setBinauralEnabled(false);
+        audioEngine.setNoiseEnabled(false);
+        audioEngine.setNatureEnabled(false);
+        audioEngine.setDroneEnabled(false);
+      }
+      syncAudioToggleUI();
+
+      // Play the user-selected track on loop; persist so reload can resume it
+      if (selectedTrackId) {
+        sessionManager.setSetting('session_trackId', selectedTrackId);
+        while (audioEngine.getLoopMode() !== 'one') audioEngine.cycleLoopMode();
+        audioEngine.playTrack(selectedTrackId);
+      } else {
+        sessionManager.setSetting('session_trackId', '');
+      }
       restoreAudioSettings();
       startTimer();
       startVisualizer();
@@ -196,6 +317,7 @@
     if (!session) return;
 
     const elapsed = sessionManager.getElapsedSeconds();
+    elapsedSeconds = elapsed; // keep elapsed counter in sync for display
     const mode = session.timerMode;
     const duration = session.timerDuration * 60; // seconds
 
@@ -258,16 +380,54 @@
     }
   }
 
+  // Timer display format: 'countdown' | 'clock' | 'elapsed'
+  let timerFormat = 'countdown';
+  let elapsedSeconds = 0;
+
   function renderTimerDisplay(seconds) {
     const display = document.getElementById('timer-display');
     if (!display) return;
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    display.textContent =
-      String(h).padStart(2, '0') + ':' +
-      String(m).padStart(2, '0') + ':' +
-      String(s).padStart(2, '0');
+
+    if (timerFormat === 'clock') {
+      const now = new Date();
+      const h = now.getHours();
+      const m = now.getMinutes();
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      display.textContent =
+        String(h12).padStart(2, '0') + ':' +
+        String(m).padStart(2, '0') + ' ' + ampm;
+    } else if (timerFormat === 'elapsed') {
+      const h = Math.floor(elapsedSeconds / 3600);
+      const m = Math.floor((elapsedSeconds % 3600) / 60);
+      const s = Math.floor(elapsedSeconds % 60);
+      display.textContent =
+        String(h).padStart(2, '0') + ':' +
+        String(m).padStart(2, '0') + ':' +
+        String(s).padStart(2, '0');
+    } else {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      display.textContent =
+        String(h).padStart(2, '0') + ':' +
+        String(m).padStart(2, '0') + ':' +
+        String(s).padStart(2, '0');
+    }
+  }
+
+  function cycleTimerFormat() {
+    const float = document.querySelector('.focus-timer-float');
+    const label = document.getElementById('timer-format-label');
+    const formats = ['countdown', 'clock', 'elapsed'];
+    const labels  = ['COUNTDOWN', 'WALL CLOCK', 'ELAPSED'];
+    const idx = (formats.indexOf(timerFormat) + 1) % formats.length;
+    timerFormat = formats[idx];
+    if (label) label.textContent = labels[idx];
+    if (float) {
+      float.classList.toggle('clock-mode',   timerFormat === 'clock');
+      float.classList.toggle('elapsed-mode', timerFormat === 'elapsed');
+    }
   }
 
   function updateProgressBar(percent, show) {
@@ -317,6 +477,10 @@
     const btnReset = document.getElementById('btn-timer-reset');
     if (btnReset) btnReset.addEventListener('click', confirmEndSession);
 
+    // Timer format toggle
+    const btnFormat = document.getElementById('btn-timer-format');
+    if (btnFormat) btnFormat.addEventListener('click', cycleTimerFormat);
+
     // End session confirmation dialog
     const confirmCancel = document.getElementById('confirm-end-cancel');
     const confirmYes = document.getElementById('confirm-end-yes');
@@ -333,13 +497,12 @@
     });
 
     // Master controls
-    wireToggle('master-play', () => {
+    wireToggle('master-play', async (active) => {
       if (!audioEngine) return;
-      if (audioEngine.playing) {
+      if (!active) {
         audioEngine.stop();
-      } else {
-        audioEngine.init().then(() => audioEngine.start()).catch(() => {});
       }
+      // If active: wireToggle already called init()+start(), nothing more needed
     });
 
     wireSlider('master-vol', v => {
@@ -416,15 +579,17 @@
       saveAudioSetting('beatVol', v);
     });
     document.querySelectorAll('.music-preset-btn[data-preset]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         document.querySelectorAll('.music-preset-btn[data-preset]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        // Sync mood button active state
         document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
         const matchingMood = document.querySelector('.mood-btn[data-preset="' + btn.dataset.preset + '"]');
         if (matchingMood) matchingMood.classList.add('active');
         if (audioEngine) {
+          if (!audioEngine.playing) { try { await audioEngine.init(); audioEngine.start(); } catch(e){} }
+          audioEngine.setMusicEnabled(true);
           audioEngine.setMusicPreset(btn.dataset.preset);
+          document.getElementById('music-toggle') && document.getElementById('music-toggle').classList.add('active');
           if (vizBG && vizBG.setGenre) vizBG.setGenre(btn.dataset.preset);
           // Sync BPM and swing sliders to the new preset
           const bpm = audioEngine.getBPM();
@@ -439,17 +604,17 @@
 
     // Mood buttons (sync with genre pills and presets)
     document.querySelectorAll('.mood-btn[data-preset]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        // Update mood button active state
+      btn.addEventListener('click', async () => {
         document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        // Also sync genre pill active state
         document.querySelectorAll('.music-preset-btn[data-preset]').forEach(b => b.classList.remove('active'));
         const matchingPill = document.querySelector('.music-preset-btn[data-preset="' + btn.dataset.preset + '"]');
         if (matchingPill) matchingPill.classList.add('active');
-        // Apply preset
         if (audioEngine) {
+          if (!audioEngine.playing) { try { await audioEngine.init(); audioEngine.start(); } catch(e){} }
+          audioEngine.setMusicEnabled(true);
           audioEngine.setMusicPreset(btn.dataset.preset);
+          document.getElementById('music-toggle') && document.getElementById('music-toggle').classList.add('active');
           if (vizBG && vizBG.setGenre) vizBG.setGenre(btn.dataset.preset);
           // Sync BPM slider
           const bpm = audioEngine.getBPM();
@@ -542,7 +707,9 @@
         // Remove button
         const removeBtn = e.target.closest('[data-remove]');
         if (removeBtn && audioEngine) {
-          audioEngine.removeCustomTrack(removeBtn.dataset.remove);
+          const removeId = removeBtn.dataset.remove;
+          audioEngine.removeCustomTrack(removeId);
+          deleteCustomTrackFromDB(removeId);
           renderTracks();
           return;
         }
@@ -654,18 +821,52 @@
       if (btnAdd && fileInput) {
         btnAdd.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', () => {
-          if (!audioEngine || !fileInput.files.length) return;
-          for (const file of fileInput.files) {
-            audioEngine.addCustomTrack(file);
-          }
-          // Switch to custom genre tab
-          document.querySelectorAll('.track-genre-tab').forEach(t => t.classList.remove('active'));
-          const customTab = document.querySelector('.track-genre-tab[data-genre="custom"]');
-          if (customTab) customTab.classList.add('active');
-          activeGenre = 'custom';
-          renderTracks();
-          showToast(fileInput.files.length + ' track(s) added');
+          if (!fileInput.files.length) return;
+          const files = Array.from(fileInput.files);
           fileInput.value = '';
+
+          // Show genre selection modal
+          const backdrop = document.getElementById('upload-genre-backdrop');
+          if (!backdrop) {
+            // Fallback: add without genre selection
+            if (!audioEngine) return;
+            files.forEach(f => audioEngine.addCustomTrack(f, 'custom'));
+            renderTracks();
+            showToast(files.length + ' track(s) added');
+            return;
+          }
+
+          let selectedGenre = 'custom';
+          backdrop.style.display = '';
+          backdrop.querySelectorAll('.upload-genre-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.genre === 'custom');
+            btn.onclick = () => {
+              selectedGenre = btn.dataset.genre;
+              backdrop.querySelectorAll('.upload-genre-btn').forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+            };
+          });
+
+          const doAdd = async () => {
+            backdrop.style.display = 'none';
+            if (!audioEngine) return;
+            for (const file of files) {
+              const track = audioEngine.addCustomTrack(file, selectedGenre);
+              await saveCustomTrackToDB(file, track.id, track.name, track.genre);
+            }
+            // Switch to selected genre tab
+            document.querySelectorAll('.track-genre-tab').forEach(t => t.classList.remove('active'));
+            const genreTab = document.querySelector('.track-genre-tab[data-genre="' + selectedGenre + '"]');
+            if (genreTab) genreTab.classList.add('active');
+            activeGenre = selectedGenre;
+            renderTracks();
+            showToast(files.length + ' track(s) added');
+          };
+
+          document.getElementById('upload-genre-confirm').onclick = doAdd;
+          document.getElementById('upload-genre-cancel').onclick = () => {
+            backdrop.style.display = 'none';
+          };
         });
       }
 
@@ -825,6 +1026,33 @@
     const btnFs = document.getElementById('btn-fullscreen');
     if (btnFs) btnFs.addEventListener('click', toggleFullscreen);
 
+    // Mic visualizer toggle
+    const btnMic = document.getElementById('btn-mic-viz');
+    if (btnMic) {
+      btnMic.addEventListener('click', async () => {
+        if (!micVizActive) {
+          try {
+            if (!micAnalyser) micAnalyser = new window.MicAnalyser();
+            await micAnalyser.start();
+            micVizActive = true;
+            btnMic.classList.add('mic-active');
+            btnMic.title = 'Stop mic sync';
+            if (vizBG && vizBG.setMicMode) vizBG.setMicMode(true);
+            showToast('Mic sync on — visuals reacting to sound');
+          } catch (e) {
+            showToast('Mic access denied');
+          }
+        } else {
+          micVizActive = false;
+          if (micAnalyser) micAnalyser.stop();
+          btnMic.classList.remove('mic-active');
+          btnMic.title = 'Sync visuals to microphone';
+          if (vizBG && vizBG.setMicMode) vizBG.setMicMode(false);
+          showToast('Mic sync off');
+        }
+      });
+    }
+
     // Panel toggle buttons
     const fabMusic = document.getElementById('fab-music');
     if (fabMusic) fabMusic.addEventListener('click', () => togglePanel('panel-music'));
@@ -854,6 +1082,18 @@
     if (backdrop) {
       backdrop.addEventListener('click', () => closeAllPanels());
     }
+
+    // Sound panel tabs
+    document.querySelectorAll('#sound-panel-tabs .panel-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('#sound-panel-tabs .panel-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const targetTab = tab.dataset.tab;
+        document.querySelectorAll('#panel-music .panel-tab-content').forEach(content => {
+          content.classList.toggle('active', content.dataset.tabContent === targetTab);
+        });
+      });
+    });
 
     // Dashboard button in topbar
     document.querySelectorAll('.focus-topbar-actions [data-screen]').forEach(btn => {
@@ -905,11 +1145,18 @@
   function wireToggle(id, callback) {
     const el = document.getElementById(id);
     if (!el) return;
-    el.addEventListener('click', () => {
+    el.addEventListener('click', async () => {
       const active = el.classList.toggle('active');
+      // Auto-init audio engine if it hasn't been started yet
+      // (all setXxxEnabled methods are no-ops when !audioEngine.playing)
+      if (active && audioEngine && !audioEngine.playing) {
+        try {
+          await audioEngine.init();
+          audioEngine.start();
+        } catch (e) { /* audio context may already be running */ }
+      }
       callback(active);
     });
-    // Support checkboxes too
     if (el.type === 'checkbox') {
       el.removeEventListener('click', el._handler);
       el.addEventListener('change', () => callback(el.checked));
@@ -924,6 +1171,23 @@
       const v = parseFloat(el.value);
       if (valEl) valEl.textContent = Number.isInteger(v) ? v : v.toFixed(1);
       callback(v);
+    });
+  }
+
+  // ─── Audio Toggle UI Sync ───────────────────────────────────────────
+
+  function syncAudioToggleUI() {
+    if (!audioEngine) return;
+    const map = {
+      'binaural-toggle': audioEngine._binauralEnabled,
+      'noise-toggle':    audioEngine._noiseEnabled,
+      'drone-toggle':    audioEngine._droneEnabled,
+      'nature-toggle':   audioEngine._natureEnabled,
+      'music-toggle':    audioEngine._musicEnabled,
+    };
+    Object.entries(map).forEach(([id, enabled]) => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('active', !!enabled);
     });
   }
 
@@ -1101,13 +1365,21 @@
   }
 
   function updateVisualizer() {
-    // Always update background visualizer (ambient mode when no audio)
     if (vizBG) {
-      vizBG.update(
-        audioEngine && audioEngine.playing ? audioEngine.getFrequencyData() : null,
-        audioEngine && audioEngine.playing ? audioEngine.getWaveformData() : null
-      );
+      let freqData = null, waveData = null;
+
+      if (micVizActive && micAnalyser && micAnalyser.active) {
+        // Mic mode: drive visuals entirely from microphone input
+        freqData = micAnalyser.getFrequencyData();
+        waveData = micAnalyser.getWaveformData();
+      } else if (audioEngine && audioEngine.playing) {
+        freqData = audioEngine.getFrequencyData();
+        waveData = audioEngine.getWaveformData();
+      }
+
+      vizBG.update(freqData, waveData);
     }
+
     if (!audioEngine || !audioEngine.playing) {
       vizBars.forEach(bar => { bar.style.height = '4px'; });
       vizAnimFrame = requestAnimationFrame(updateVisualizer);
@@ -1525,6 +1797,9 @@
         case 'KeyM':
           toggleMute();
           break;
+        case 'KeyT':
+          togglePanel('panel-music');
+          break;
         case 'KeyF':
           toggleFullscreen();
           break;
@@ -1600,18 +1875,120 @@
 
     renderTasks();
 
-    selectedPreset = session.preset || 'deep-work';
+    selectedPreset = (session.preset && session.preset !== 'none') ? session.preset : null;
+
+    // Start timer immediately so display shows correct elapsed time from saved session
+    startTimer();
+    tickTimer();
+    startVisualizer();
+    if (window._updateMusicSuggestion) window._updateMusicSuggestion();
+    if (window._renderTrackList) window._renderTrackList();
+
+    // Audio requires user interaction — try to start, then show resume banner if blocked
     audioEngine.init().then(() => {
       audioEngine.start();
-      if (session.preset) audioEngine.applyPreset(session.preset);
+
+      const savedTrackId = sessionManager.getSetting('session_trackId', '');
+      if (savedTrackId) {
+        // Session was started with a track — silence all layers, play track on loop
+        audioEngine.setBinauralEnabled(false);
+        audioEngine.setNoiseEnabled(false);
+        audioEngine.setNatureEnabled(false);
+        audioEngine.setDroneEnabled(false);
+        while (audioEngine.getLoopMode() !== 'one') audioEngine.cycleLoopMode();
+        audioEngine.playTrack(savedTrackId);
+      } else if (selectedPreset) {
+        // Session was started with a neural preset — apply it
+        audioEngine.applyPreset(selectedPreset);
+      } else {
+        // No preset, no track — start silent
+        audioEngine.setBinauralEnabled(false);
+        audioEngine.setNoiseEnabled(false);
+        audioEngine.setNatureEnabled(false);
+        audioEngine.setDroneEnabled(false);
+      }
+      syncAudioToggleUI();
       restoreAudioSettings();
-      startTimer();
-      startVisualizer();
-      if (window._updateMusicSuggestion) window._updateMusicSuggestion();
-      if (window._renderTrackList) window._renderTrackList();
+      hideAudioResumeBanner();
     }).catch(() => {
-      startTimer();
+      showAudioResumeBanner();
     });
+
+    // Show banner after a short delay; if audio started fine it will be hidden
+    setTimeout(() => {
+      if (!audioEngine.playing) showAudioResumeBanner();
+    }, 800);
+  }
+
+  function showAudioResumeBanner() {
+    let banner = document.getElementById('audio-resume-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'audio-resume-banner';
+      banner.className = 'audio-resume-banner';
+      banner.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Tap to resume audio';
+      banner.addEventListener('click', () => {
+        audioEngine.init().then(() => {
+          audioEngine.start();
+          const savedTrackId = sessionManager.getSetting('session_trackId', '');
+          if (savedTrackId) {
+            audioEngine.setBinauralEnabled(false);
+            audioEngine.setNoiseEnabled(false);
+            audioEngine.setNatureEnabled(false);
+            audioEngine.setDroneEnabled(false);
+            while (audioEngine.getLoopMode() !== 'one') audioEngine.cycleLoopMode();
+            audioEngine.playTrack(savedTrackId);
+          } else if (selectedPreset) {
+            audioEngine.applyPreset(selectedPreset);
+          }
+          syncAudioToggleUI();
+          restoreAudioSettings();
+          hideAudioResumeBanner();
+        }).catch(() => {});
+      });
+      document.getElementById('screen-focus')?.appendChild(banner);
+    }
+    banner.style.display = 'flex';
+  }
+
+  function hideAudioResumeBanner() {
+    const banner = document.getElementById('audio-resume-banner');
+    if (banner) banner.style.display = 'none';
+  }
+
+  // ─── Clap Detection ─────────────────────────────────────────────────
+
+  function initClapDetection() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return; // browser doesn't support it
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = function (e) {
+      const result = e.results[e.results.length - 1][0];
+      const transcript = result.transcript.trim().toLowerCase();
+      const confidence = result.confidence;
+
+      // Require high confidence and an exact phrase match (not a substring of unrelated speech)
+      const PHRASES = ['start the timer', 'start timer'];
+      const exactMatch = PHRASES.some(p => transcript === p || transcript === p + '.' || transcript === p + '!');
+      if (exactMatch && confidence > 0.7) {
+        const welcomeScreen = document.getElementById('screen-welcome');
+        if (welcomeScreen && welcomeScreen.classList.contains('active')) {
+          beginSession();
+        }
+      }
+    };
+
+    recognition.onend = function () {
+      // Restart so it keeps listening continuously
+      try { recognition.start(); } catch (_) {}
+    };
+
+    try { recognition.start(); } catch (_) {}
   }
 
   // ─── Initialization ─────────────────────────────────────────────────
@@ -1619,6 +1996,9 @@
   document.addEventListener('DOMContentLoaded', () => {
     audioEngine = new window.AudioEngine();
     sessionManager = new window.SessionManager();
+
+    // Restore persisted custom tracks
+    restoreCustomTracksFromDB();
 
     // Check for active session
     const active = sessionManager.getActiveSession();
@@ -1638,20 +2018,55 @@
     initKeyboardShortcuts();
     initBreathingExercise();
     initVisualizer();
+    initClapDetection();
     if (window.VisualizerBG) {
       const bgEl = document.getElementById('bg-canvas');
       if (bgEl) {
         vizBG = new VisualizerBG(bgEl);
       }
     }
+
+    // Mouse parallax for visualizer
+    window.addEventListener('mousemove', function (e) {
+      if (!vizBG) return;
+      const nx = (e.clientX / window.innerWidth) * 2 - 1;
+      const ny = (e.clientY / window.innerHeight) * 2 - 1;
+      vizBG.setMousePosition(nx, ny);
+    });
+
+    // Click → particle burst + fractal ripple
+    window.addEventListener('click', function (e) {
+      if (!vizBG) return;
+      const nx = (e.clientX / window.innerWidth) * 2 - 1;
+      const ny = -((e.clientY / window.innerHeight) * 2 - 1); // flip Y for WebGL
+      vizBG.triggerClick(nx, ny);
+    });
+
+    // Scroll → push camera closer/further for depth feel
+    window.addEventListener('wheel', function (e) {
+      if (!vizBG || !vizBG.camera) return;
+      const delta = e.deltaY * 0.04;
+      vizBG.camera.position.z = Math.max(35, Math.min(70, vizBG.camera.position.z + delta));
+    }, { passive: true });
+
+    // Genre-change → update CSS background accent
+    const PALETTE_BG = {
+      warm:   '40, 15, 5',
+      cool:   '5, 10, 35',
+      neon:   '0, 20, 10',
+      fire:   '40, 5, 0',
+      ice:    '5, 20, 40',
+      psyche: '25, 5, 30',
+    };
+    window.addEventListener('genre-change', function (e) {
+      const rgb = PALETTE_BG[e.detail.palette] || '10, 10, 25';
+      document.documentElement.style.setProperty('--genre-bg', rgb);
+      document.body.dataset.genre = e.detail.genre;
+    });
+
     showRandomTip();
 
-    // Auto-select first preset on welcome
-    const firstPreset = document.querySelector('.preset-card[data-preset]');
-    if (firstPreset && !selectedPreset) {
-      firstPreset.classList.add('active');
-      selectedPreset = firstPreset.dataset.preset;
-    }
+    // No auto-select for neural preset — user must opt in explicitly
 
     // beforeunload warning during active session
     window.addEventListener('beforeunload', function (e) {
