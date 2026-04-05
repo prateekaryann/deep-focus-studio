@@ -804,11 +804,59 @@
     setTextIfExists('stat-streak', allTime.streak ?? 0);
     setTextIfExists('stat-best-streak', allTime.bestStreak ?? 0);
 
+    // Gamification
+    renderGamification();
+
     // Weekly chart
     renderWeeklyChart();
 
     // History list
     renderHistory();
+  }
+
+  function renderGamification() {
+    // Level & XP
+    const gam = sessionManager.getGamificationStats();
+    setTextIfExists('level-number', gam.level);
+    setTextIfExists('rank-badge', gam.rank);
+    setTextIfExists('xp-current', gam.xpInLevel);
+    setTextIfExists('xp-next', gam.xpForNext);
+    setTextIfExists('total-xp', gam.totalXP.toLocaleString());
+
+    const xpFill = document.getElementById('xp-bar-fill');
+    if (xpFill) {
+      const pct = gam.xpForNext > 0 ? (gam.xpInLevel / gam.xpForNext) * 100 : 0;
+      xpFill.style.width = pct + '%';
+    }
+
+    // Daily goal ring
+    const goalData = sessionManager.getDailyGoalProgress();
+    setTextIfExists('goal-ring-percent', goalData.percent + '%');
+    const ringFill = document.getElementById('goal-ring-fill');
+    if (ringFill) {
+      const circumference = 326.7;
+      const offset = circumference - (circumference * goalData.percent / 100);
+      ringFill.style.strokeDashoffset = offset;
+    }
+
+    // Achievements
+    const achievements = sessionManager.getAchievements();
+    const unlocked = achievements.filter(a => a.unlocked).length;
+    setTextIfExists('achievements-count', unlocked + '/' + achievements.length);
+
+    const grid = document.getElementById('achievements-grid');
+    if (grid) {
+      grid.innerHTML = '';
+      achievements.forEach(a => {
+        const card = document.createElement('div');
+        card.className = 'achievement-card' + (a.unlocked ? ' unlocked' : ' locked');
+        card.title = a.desc;
+        card.innerHTML =
+          '<div class="achievement-icon">' + a.icon + '</div>' +
+          '<div class="achievement-name">' + escapeHtml(a.name) + '</div>';
+        grid.appendChild(card);
+      });
+    }
   }
 
   function setTextIfExists(id, text) {

@@ -27,6 +27,15 @@ const CHORDS = {
   G13: ['G2', 'B2', 'D3', 'F3', 'E3'],
   Cmaj9: ['C3', 'E3', 'G3', 'B3', 'D4'],
   A7b9: ['A2', 'C#3', 'E3', 'G3', 'Bb3'],
+  Cm: ['C3', 'Eb3', 'G3'],
+  Gm: ['G2', 'Bb2', 'D3'],
+  Bb: ['Bb2', 'D3', 'F3'],
+  Fm7: ['F2', 'Ab2', 'C3', 'Eb3'],
+  Bbmaj7: ['Bb2', 'D3', 'F3', 'A3'],
+  Ebmaj7: ['Eb3', 'G3', 'Bb3', 'D4'],
+  Cm9: ['C3', 'Eb3', 'G3', 'Bb3', 'D4'],
+  Fsus4: ['F2', 'Bb2', 'C3'],
+  Gsus2: ['G2', 'A2', 'D3'],
 };
 
 const MUSIC_PRESETS = {
@@ -79,7 +88,7 @@ const MUSIC_PRESETS = {
   dubtechno: {
     name: 'Dub Techno',
     bpm: 124,
-    chords: ['Dm7', 'Am7', 'Dm7', 'Am7'],
+    chords: ['Cm', 'Gm', 'Cm', 'Gm'],
     padOsc: 'sawtooth', padAttack: 1.5, padDecay: 2, padSustain: 0.5, padRelease: 4,
     arpOsc: 'triangle', arpOctave: 4, arpPattern: 'up',
     bassOsc: 'sine', bassFilterFreq: 300, bassFilterQ: 1,
@@ -110,7 +119,7 @@ const MUSIC_PRESETS = {
   dnb: {
     name: 'Drum & Bass',
     bpm: 174,
-    chords: ['Am7', 'Fmaj7', 'Cmaj7', 'Em7'],
+    chords: ['Cm9', 'Fm7', 'Bbmaj7', 'Ebmaj7'],
     padOsc: 'triangle', padAttack: 1, padDecay: 2, padSustain: 0.6, padRelease: 3,
     arpOsc: 'triangle', arpOctave: 5, arpPattern: 'up-down',
     bassOsc: 'sine', bassFilterFreq: 500, bassFilterQ: 2,
@@ -156,7 +165,7 @@ const MUSIC_PRESETS = {
   ambienttechno: {
     name: 'Ambient Techno',
     bpm: 110,
-    chords: ['Am7', 'Fmaj7', 'Cmaj7', 'Em7'],
+    chords: ['Fsus4', 'Gsus2', 'Am7', 'Fsus4'],
     padOsc: 'sine', padAttack: 3, padDecay: 4, padSustain: 0.5, padRelease: 5,
     arpOsc: 'sine', arpOctave: 5, arpPattern: 'random',
     bassOsc: 'sine', bassFilterFreq: 300, bassFilterQ: 1,
@@ -219,6 +228,13 @@ class AudioEngine {
     this._swing = 0;
     this._bassFilterCutoff = 400;
     this._bassFilterQ = 1;
+
+    // Sound design parameters
+    this._reverbMix = 0.5;       // 0-1, reverb wet amount
+    this._delayMix = 0.4;        // 0-1, delay feedback amount
+    this._density = 0.7;         // 0-1, note trigger probability multiplier
+    this._padAttack = 0.5;       // 0-1, pad envelope attack (maps to 0.01-5s)
+    this._arpPattern = 'up';     // up, down, up-down, random
 
     // Audio nodes (created in init)
     this._nodes = {};
@@ -629,6 +645,25 @@ class AudioEngine {
     this._musicSynths = [];
   }
 
+  /** Post-process all music synths to apply sound design params (reverb, delay). */
+  _postProcessMusic() {
+    this._musicSynths.forEach(s => {
+      try {
+        // Reverb nodes have 'wet' and 'decay' properties
+        if (s instanceof Tone.Reverb) {
+          s.wet.rampTo(this._reverbMix, RAMP);
+          if (this._liveReverbs && !this._liveReverbs.includes(s)) this._liveReverbs.push(s);
+        }
+        // Delay nodes have 'feedback' and 'wet'
+        if (s instanceof Tone.FeedbackDelay || s instanceof Tone.PingPongDelay) {
+          const fb = Math.min(0.9, s.feedback.value * (this._delayMix / 0.4));
+          s.feedback.rampTo(fb, RAMP);
+          if (this._liveDelays && !this._liveDelays.includes(s)) this._liveDelays.push(s);
+        }
+      } catch (_) {}
+    });
+  }
+
   /** Dispose current music synths and parts, then rebuild for the active preset. */
   _teardownMusic() {
     this._musicParts.forEach(p => { try { p.stop(); p.dispose(); } catch (_) {} });
@@ -639,9 +674,9 @@ class AudioEngine {
 
   // ── Shared helpers for pattern variation ──
 
-  /** Probabilistic note trigger - creates variation across cycles */
+  /** Probabilistic note trigger - scales by density parameter */
   _prob(probability) {
-    return Math.random() < probability;
+    return Math.random() < (probability * this._density / 0.7);
   }
 
   /** Random velocity variation */
@@ -652,6 +687,45 @@ class AudioEngine {
   /** Humanize timing (slight random offset in seconds) */
   _humanize(ms) {
     return (Math.random() - 0.5) * ms / 1000;
+  }
+
+  /** Compute pad attack time from _padAttack (0-1) and preset default */
+  _getPadAttack(presetDefault) {
+    return presetDefault * (0.1 + this._padAttack * 1.8);
+  }
+
+  /** Get reverb wet amount */
+  _getReverbWet() { return this._reverbMix; }
+
+  /** Get delay feedback scaled by preset default */
+  _getDelayFeedback(presetDefault) {
+    return presetDefault * (this._delayMix / 0.4);
+  }
+
+  /** Get arp notes from chord in the selected pattern */
+  _getArpNotes(chordNotes, octave) {
+    if (!chordNotes) return [];
+    const notes = chordNotes.map(n => {
+      const letter = n.replace(/[0-9]/g, '');
+      return letter + octave;
+    });
+    const pattern = this._arpPattern;
+    if (pattern === 'down') return notes.slice().reverse();
+    if (pattern === 'up-down') return [...notes, ...notes.slice(1, -1).reverse()];
+    if (pattern === 'random') return notes.sort(() => Math.random() - 0.5);
+    return notes; // 'up'
+  }
+
+  /** Register a reverb for live control */
+  _trackReverb(reverb) {
+    reverb.wet.value = this._reverbMix;
+    if (this._liveReverbs) this._liveReverbs.push(reverb);
+  }
+
+  /** Register a delay for live control */
+  _trackDelay(delay) {
+    if (delay.feedback) delay.feedback.value = Math.min(0.9, this._delayMix * 0.8);
+    if (this._liveDelays) this._liveDelays.push(delay);
   }
 
   /** Shared swing-time calculator */
@@ -674,6 +748,8 @@ class AudioEngine {
 
   _startMusic() {
     this._teardownMusic();
+    this._liveReverbs = [];
+    this._liveDelays = [];
     const presetName = this._musicPreset;
     const preset = MUSIC_PRESETS[presetName];
     if (!preset) return;
@@ -701,6 +777,8 @@ class AudioEngine {
       case 'hardtechno': this._buildHardTechno(preset); break;
       default: this._buildGeneric(preset); break;
     }
+
+    this._postProcessMusic();
   }
 
   // ── Genre-specific builders ──
@@ -712,7 +790,8 @@ class AudioEngine {
 
     // Pad: FMSynth - metallic/bell tones
     try {
-      const padReverb = new Tone.Reverb({ decay: 6, wet: 0.5 }).connect(n.padGain);
+      const padReverb = new Tone.Reverb({ decay: 6, wet: this._getReverbWet() }).connect(n.padGain);
+      this._trackReverb(padReverb);
       this._musicSynths.push(padReverb);
 
       const padSynth = new Tone.PolySynth(Tone.FMSynth, {
@@ -721,7 +800,7 @@ class AudioEngine {
         options: {
           harmonicity: 1.414,
           modulationIndex: 8,
-          envelope: { attack: 3, decay: 2, sustain: 0.3, release: 3 },
+          envelope: { attack: this._getPadAttack(3), decay: 2, sustain: 0.3, release: 3 },
           modulation: { type: 'sine' },
           modulationEnvelope: { attack: 2, decay: 1, sustain: 0.5, release: 3 },
           volume: -8,
@@ -743,8 +822,9 @@ class AudioEngine {
     // Arp: PluckSynth - plucked string through PingPongDelay
     try {
       const ppDelay = new Tone.PingPongDelay({
-        delayTime: '8n.', feedback: 0.4, wet: 0.35,
+        delayTime: '8n.', feedback: this._getDelayFeedback(0.4), wet: 0.35,
       }).connect(n.arpGain);
+      this._trackDelay(ppDelay);
       this._musicSynths.push(ppDelay);
 
       const arpSynth = new Tone.PluckSynth({
@@ -757,10 +837,9 @@ class AudioEngine {
       chordNames.forEach((chordName, ci) => {
         const notes = CHORDS[chordName];
         if (!notes) return;
+        const arpNotes = this._getArpNotes(notes, 5);
         for (let s = 0; s < 4; s++) {
-          const note = notes[s % notes.length];
-          const letter = note.replace(/[0-9]/g, '');
-          arpEvents.push([ci * barLen + s * Tone.Time('4n').toSeconds(), letter + '5']);
+          arpEvents.push([ci * barLen + s * Tone.Time('4n').toSeconds(), arpNotes[s % arpNotes.length]]);
         }
       });
       const arpPart = new Tone.Part((time, note) => {
@@ -787,16 +866,20 @@ class AudioEngine {
       }).connect(n.beatGain);
       this._musicSynths.push(hat);
 
+      // Minimal: sparse kick pattern with random skips, only occasional hats
       const beatPart = new Tone.Part((time, type) => {
-        if (type === 'k') kick.triggerAttackRelease('C1', '8n', time);
-        else hat.triggerAttackRelease('32n', time);
+        if (type === 'k') {
+          if (this._prob(0.85)) kick.triggerAttackRelease('C1', '8n', time);
+        } else {
+          if (this._prob(0.6)) hat.triggerAttackRelease('32n', time, this._randVel(0.3, 0.2));
+        }
       }, [
         { time: 0, type: 'k' },
         { time: this._getSwungTime(4, 0), type: 'k' },
         { time: this._getSwungTime(8, 0), type: 'k' },
         { time: this._getSwungTime(12, 0), type: 'k' },
-        { time: this._getSwungTime(4, 0), type: 'h' },
-        { time: this._getSwungTime(12, 0), type: 'h' },
+        { time: this._getSwungTime(6, 0), type: 'h' },
+        { time: this._getSwungTime(14, 0), type: 'h' },
       ]);
       beatPart.loop = true;
       beatPart.loopEnd = Tone.Time('1m').toSeconds();
@@ -1033,10 +1116,10 @@ class AudioEngine {
 
       const bassSynth = new Tone.MonoSynth({
         oscillator: { type: 'sawtooth' },
-        filter: { type: 'lowpass', rolloff: -24, Q: 15 },
+        filter: { type: 'lowpass', rolloff: -24, Q: 18 },
         filterEnvelope: {
-          attack: 0.005, decay: 0.15, sustain: 0.05, release: 0.2,
-          baseFrequency: 200, octaves: 4,
+          attack: 0.01, decay: 0.2, sustain: 0.05, release: 0.2,
+          baseFrequency: 150, octaves: 4,
         },
         envelope: { attack: 0.005, decay: 0.12, sustain: 0.15, release: 0.2 },
         volume: -4,
@@ -1055,9 +1138,10 @@ class AudioEngine {
         const root = notes[0].replace(/[0-9]/g, '');
         for (let s = 0; s < 16; s++) {
           if (notePattern[s]) {
+            const octave = Math.random() < 0.3 ? '3' : (Math.random() < 0.15 ? '1' : '2');
             bassEvents.push({
               time: ci * barLen + this._getSwungTime(s, 0),
-              note: root + '2',
+              note: root + octave,
               accent: accentPattern[s],
               slide: slidePattern[s],
             });
@@ -1123,11 +1207,13 @@ class AudioEngine {
       }).connect(padReverb);
       this._musicSynths.push(padSynth);
 
+      // Sparse: chord stab every 2 bars
+      const padEvents = chordNames.filter((_, i) => i % 2 === 0).map((c, i) => [i * 2 * barLen, c]);
       const padPart = new Tone.Part((time, chord) => {
         const notes = CHORDS[chord];
         if (!notes) return;
-        padSynth.triggerAttackRelease(notes, '1m', time, this._randVel(0.35, 0.1));
-      }, chordNames.map((c, i) => [i * barLen, c]));
+        padSynth.triggerAttackRelease(notes, '2m', time, this._randVel(0.35, 0.1));
+      }, padEvents);
       padPart.loop = true;
       padPart.loopEnd = chordNames.length * barLen;
       padPart.start(0);
@@ -1486,10 +1572,10 @@ class AudioEngine {
       }).connect(n.beatGain);
       this._musicSynths.push(hat);
 
-      // Breakbeat pattern with syncopation
+      // Breakbeat pattern: kick on 1 and the "and" of 3
       const beatEvents = [
         { time: this._getSwungTime(0, swing), type: 'k' },
-        { time: this._getSwungTime(10, swing), type: 'k' },
+        { time: this._getSwungTime(7, swing), type: 'k' },
         // Hard snare on 2 and 4
         { time: this._getSwungTime(4, swing), type: 's' },
         { time: this._getSwungTime(12, swing), type: 's' },
@@ -1578,19 +1664,28 @@ class AudioEngine {
         options: {
           harmonicity: 2,
           modulationIndex: 3,
-          envelope: { attack: 0.5, decay: 1, sustain: 0.7, release: 2 },
+          envelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.4 },
           modulation: { type: 'sine' },
-          modulationEnvelope: { attack: 0.3, decay: 0.8, sustain: 0.4, release: 1.5 },
+          modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.3 },
           volume: -8,
         },
       }).connect(padReverb);
       this._musicSynths.push(padSynth);
 
+      // Offbeat chord stabs, not sustained pads
+      const padEvents = [];
+      chordNames.forEach((chordName, ci) => {
+        [2, 6, 10, 14].forEach(pos => {
+          padEvents.push([ci * barLen + this._getSwungTime(pos, swing), chordName]);
+        });
+      });
       const padPart = new Tone.Part((time, chord) => {
         const notes = CHORDS[chord];
         if (!notes) return;
-        padSynth.triggerAttackRelease(notes, '1m', time, this._randVel(0.45, 0.1));
-      }, chordNames.map((c, i) => [i * barLen, c]));
+        if (this._prob(0.85)) {
+          padSynth.triggerAttackRelease(notes, '8n', time, this._randVel(0.45, 0.15));
+        }
+      }, padEvents);
       padPart.loop = true;
       padPart.loopEnd = chordNames.length * barLen;
       padPart.start(0);
@@ -1933,16 +2028,18 @@ class AudioEngine {
       }).connect(arpDelay);
       this._musicSynths.push(arpSynth);
 
-      // Sparse: triggered randomly
+      // Very sparse: random bell tones every 3-8 seconds
       const arpLoop = new Tone.Loop((time) => {
         const chordName = chordNames[Math.floor(Math.random() * chordNames.length)];
         const notes = CHORDS[chordName];
         if (!notes) return;
         const note = notes[Math.floor(Math.random() * notes.length)];
         const letter = note.replace(/[0-9]/g, '');
-        arpSynth.triggerAttackRelease(letter + '5', '4n', time, this._randVel(0.3, 0.15));
-      }, '2n');
-      arpLoop.probability = 0.4;
+        const octave = Math.random() < 0.5 ? '5' : '6';
+        arpSynth.triggerAttackRelease(letter + octave, '2n', time, this._randVel(0.2, 0.15));
+      }, '1m');
+      arpLoop.probability = 0.35;
+      arpLoop.humanize = '3s';
       arpLoop.start(0);
       this._musicParts.push(arpLoop);
     } catch (_) {}
@@ -2362,6 +2459,41 @@ class AudioEngine {
     if (this._nodes.bassFilter) {
       this._nodes.bassFilter.Q.rampTo(q, RAMP);
     }
+  }
+
+  // ───────── SOUND DESIGN ─────────
+
+  /** Set reverb wet amount (0-1). @param {number} v */
+  setReverbMix(v) {
+    this._reverbMix = v;
+    if (this._liveReverbs) {
+      this._liveReverbs.forEach(r => { try { r.wet.rampTo(v, RAMP); } catch (_) {} });
+    }
+  }
+
+  /** Set delay feedback amount (0-1). @param {number} v */
+  setDelayMix(v) {
+    this._delayMix = v;
+    if (this._liveDelays) {
+      this._liveDelays.forEach(d => { try { d.feedback.rampTo(v * 0.8, RAMP); } catch (_) {} });
+    }
+  }
+
+  /** Set note density / probability multiplier (0-1). @param {number} v */
+  setDensity(v) {
+    this._density = v;
+  }
+
+  /** Set pad attack time (0-1, maps to 0.01-5s). @param {number} v */
+  setPadAttack(v) {
+    this._padAttack = v;
+    if (this._musicEnabled && this.playing) this._startMusic();
+  }
+
+  /** Set arp pattern. @param {string} pattern - up, down, up-down, random */
+  setArpPattern(pattern) {
+    this._arpPattern = pattern;
+    if (this._musicEnabled && this.playing) this._startMusic();
   }
 
   // ───────── MASTER ─────────

@@ -261,6 +261,104 @@ class SessionManager {
   }
 
   // =========================================================================
+  //  GAMIFICATION
+  // =========================================================================
+
+  /**
+   * XP per focus minute. Bonus XP for streaks and long sessions.
+   * @returns {{ totalXP: number, level: number, xpInLevel: number, xpForNext: number, rank: string }}
+   */
+  getGamificationStats() {
+    let totalXP = 0;
+    this.sessions.forEach(s => {
+      const mins = s.focusMinutes || 0;
+      let xp = mins * 10; // 10 XP per minute
+      if (mins >= 60) xp += 100;  // long session bonus
+      if (mins >= 90) xp += 200;  // marathon bonus
+      totalXP += xp;
+    });
+
+    // Streak bonus: add to total
+    const streak = this._calculateStreak();
+    totalXP += streak * 50;
+
+    const level = this._xpToLevel(totalXP);
+    const xpForThisLevel = this._levelToXP(level);
+    const xpForNext = this._levelToXP(level + 1);
+
+    const ranks = [
+      'Novice', 'Apprentice', 'Initiate', 'Adept', 'Scholar',
+      'Expert', 'Master', 'Grandmaster', 'Sage', 'Legend', 'Mythic'
+    ];
+    const rank = ranks[Math.min(Math.floor(level / 5), ranks.length - 1)];
+
+    return { totalXP, level, xpInLevel: totalXP - xpForThisLevel, xpForNext: xpForNext - xpForThisLevel, rank };
+  }
+
+  _xpToLevel(xp) {
+    // Each level requires progressively more XP: level N needs 500*N XP
+    let level = 0;
+    let total = 0;
+    while (total + (level + 1) * 500 <= xp) {
+      level++;
+      total += level * 500;
+    }
+    return level;
+  }
+
+  _levelToXP(level) {
+    // Total XP needed to reach this level
+    let total = 0;
+    for (let i = 1; i <= level; i++) total += i * 500;
+    return total;
+  }
+
+  /**
+   * Check which achievements have been unlocked.
+   * @returns {Array<{ id: string, name: string, desc: string, icon: string, unlocked: boolean }>}
+   */
+  getAchievements() {
+    const all = this.getAllTimeStats();
+    const streak = all.streak;
+    const bestStreak = all.bestStreak;
+    const totalSessions = all.totalSessions;
+    const totalMinutes = all.totalMinutes;
+    const totalHours = Math.floor(totalMinutes / 60);
+    const longest = all.longestSession;
+    const presets = new Set(this.sessions.map(s => s.preset).filter(Boolean));
+
+    const achievements = [
+      { id: 'first_session', name: 'First Step', desc: 'Complete your first session', icon: '\u{1F331}', unlocked: totalSessions >= 1 },
+      { id: 'ten_sessions', name: 'Getting Serious', desc: 'Complete 10 sessions', icon: '\u{1F4AA}', unlocked: totalSessions >= 10 },
+      { id: 'fifty_sessions', name: 'Dedicated', desc: 'Complete 50 sessions', icon: '\u{1F525}', unlocked: totalSessions >= 50 },
+      { id: 'hundred_sessions', name: 'Centurion', desc: 'Complete 100 sessions', icon: '\u{1F3C6}', unlocked: totalSessions >= 100 },
+      { id: 'one_hour', name: 'Hour Power', desc: 'Accumulate 1 hour of focus', icon: '\u{23F0}', unlocked: totalHours >= 1 },
+      { id: 'ten_hours', name: 'Deep Diver', desc: 'Accumulate 10 hours of focus', icon: '\u{1F30A}', unlocked: totalHours >= 10 },
+      { id: 'fifty_hours', name: 'Focus Warrior', desc: '50 hours of total focus', icon: '\u{2694}\u{FE0F}', unlocked: totalHours >= 50 },
+      { id: 'hundred_hours', name: 'Time Lord', desc: '100 hours of total focus', icon: '\u{1F551}', unlocked: totalHours >= 100 },
+      { id: 'streak_3', name: 'Hat Trick', desc: '3-day streak', icon: '\u{1F3AF}', unlocked: bestStreak >= 3 },
+      { id: 'streak_7', name: 'Week Warrior', desc: '7-day streak', icon: '\u{1F4C5}', unlocked: bestStreak >= 7 },
+      { id: 'streak_30', name: 'Unstoppable', desc: '30-day streak', icon: '\u{26A1}', unlocked: bestStreak >= 30 },
+      { id: 'long_session', name: 'Marathon Mind', desc: '90+ minute session', icon: '\u{1F9E0}', unlocked: longest >= 90 },
+      { id: 'explorer', name: 'Explorer', desc: 'Try 3 different presets', icon: '\u{1F9ED}', unlocked: presets.size >= 3 },
+      { id: 'all_presets', name: 'Versatile', desc: 'Try all 5 presets', icon: '\u{1F308}', unlocked: presets.size >= 5 },
+    ];
+
+    return achievements;
+  }
+
+  /**
+   * Get daily focus goal (default 60 min) and progress.
+   * @returns {{ goal: number, current: number, percent: number }}
+   */
+  getDailyGoalProgress() {
+    const goal = this.getSetting('daily_focus_goal', 60);
+    const today = this.getTodayStats();
+    const current = today.minutes;
+    return { goal, current, percent: Math.min(100, Math.round((current / goal) * 100)) };
+  }
+
+  // =========================================================================
   //  SESSION HISTORY
   // =========================================================================
 

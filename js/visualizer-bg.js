@@ -1,5 +1,5 @@
 /**
- * VisualizerBG - Genre-reactive Three.js particle background for Deep Focus Studio
+ * VisualizerBG - Pixel-perfect, per-particle audio-reactive Three.js background
  */
 (function () {
   'use strict';
@@ -27,8 +27,8 @@
 
   const VERT_SHADER = `
     attribute float aSize;
-    attribute float aAlpha;
     attribute float aPhase;
+    attribute float aActive;
     uniform float uTime;
     uniform float uBass;
     uniform float uMids;
@@ -38,65 +38,71 @@
     uniform float uChaos;
     uniform float uPulseStrength;
     varying float vAlpha;
-    varying float vDist;
+    varying float vActive;
 
     void main() {
-      vAlpha = aAlpha;
       vec3 pos = position;
-      vec3 dir = normalize(pos + vec3(0.001));
+      vec3 dir = normalize(pos + vec3(0.0001));
       float t = uTime * uSpeed;
 
-      // Smooth wave displacement
-      float wave = sin(pos.x * 1.5 + t) * cos(pos.y * 1.2 + t * 0.7) * uDisplacement;
+      // Displacement
+      float wave = sin(pos.x * 1.5 + t) * cos(pos.y * 1.2 + t * 0.7);
+      float pulse = uBass * uPulseStrength;
+      pos += dir * (wave * uDisplacement + pulse) * 1.5;
 
-      // Bass pulse - push outward on beat
-      float pulse = uBass * uPulseStrength * 2.0;
-      pos += dir * (wave + pulse);
+      // Chaos
+      pos.x += sin(t * 3.0 + aPhase * 7.0) * uChaos * (0.5 + uBass);
+      pos.y += cos(t * 4.0 + aPhase * 5.0) * uChaos * (0.5 + uBass);
+      pos.z += sin(t * 2.5 + aPhase * 9.0) * uChaos * (0.5 + uBass);
 
-      // Chaos jitter (aggressive genres)
-      if (uChaos > 0.0) {
-        pos.x += sin(t * 3.0 + aPhase * 7.0) * uChaos * uBass;
-        pos.y += cos(t * 4.0 + aPhase * 5.0) * uChaos * uBass;
-        pos.z += sin(t * 2.5 + aPhase * 9.0) * uChaos * uBass;
-      }
-
-      // Gentle ambient drift (always present)
-      pos.x += sin(t * 0.3 + aPhase) * 0.15;
-      pos.y += cos(t * 0.25 + aPhase * 1.3) * 0.15;
+      // Ambient drift
+      pos.x += sin(t * 0.2 + aPhase) * 0.2;
+      pos.y += cos(t * 0.15 + aPhase * 1.3) * 0.2;
 
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-      float sizeMod = 1.0 + uMids * 0.5;
-      gl_PointSize = aSize * sizeMod * (150.0 / -mvPosition.z);
+
+      // Size: small base, bigger when active
+      float baseSize = aSize;
+      float activeBoost = 1.0 + aActive * 2.0;
+      float midsBoost = 1.0 + uMids * 0.3;
+      gl_PointSize = baseSize * activeBoost * midsBoost * (80.0 / -mvPosition.z);
+      gl_PointSize = clamp(gl_PointSize, 1.0, 12.0);
+
       gl_Position = projectionMatrix * mvPosition;
 
-      vDist = length(mvPosition.xyz);
+      // Alpha: active particles are brighter
+      float distFade = clamp(1.0 - length(mvPosition.xyz) / 70.0, 0.05, 1.0);
+      vAlpha = (0.5 + aActive * 0.5) * distFade;
+      vActive = aActive;
     }
   `;
 
   const FRAG_SHADER = `
-    precision mediump float;
+    precision highp float;
     varying float vAlpha;
-    varying float vDist;
-    uniform float uHighs;
+    varying float vActive;
     uniform vec3 uColor;
+    uniform float uHighs;
 
     void main() {
-      vec2 center = gl_PointCoord - vec2(0.5);
-      float dist = length(center);
+      vec2 uv = gl_PointCoord - vec2(0.5);
+      float dist = length(uv);
+
       if (dist > 0.5) discard;
 
-      // Sharp core with subtle soft edge
-      float core = smoothstep(0.5, 0.15, dist);
-      float glow = smoothstep(0.5, 0.0, dist) * 0.3;
-      float alpha = (core + glow) * vAlpha;
+      // Sharp core with subtle halo
+      float core = 1.0 - smoothstep(0.0, 0.15, dist);
+      float ring = smoothstep(0.5, 0.2, dist) * 0.4;
+      float alpha = core + ring;
 
-      float brightness = 0.7 + uHighs * 0.3;
+      // Active particles get a bright highlight
+      float brightness = 0.6 + uHighs * 0.2 + vActive * 0.4;
 
-      // Distance fade
-      float distFade = clamp(1.0 - vDist / 60.0, 0.1, 1.0);
-      alpha *= distFade;
+      // Warm tint when active
+      vec3 col = uColor * brightness;
+      col += vec3(0.15, 0.08, 0.0) * vActive;
 
-      gl_FragColor = vec4(uColor * brightness, alpha * 0.8);
+      gl_FragColor = vec4(col, alpha * vAlpha);
     }
   `;
 
@@ -111,7 +117,7 @@
       this.container = containerEl;
       this.clock = new THREE.Clock();
       this.isMobile = window.innerWidth < 768;
-      this.particleCount = this.isMobile ? 800 : 1500;
+      this.particleCount = this.isMobile ? 1000 : 2000;
       this.maxConnections = this.isMobile ? 150 : 300;
       this.connectionThreshold = 2.8;
 
@@ -123,13 +129,14 @@
       this.targetProfile = Object.assign({}, DEFAULT_PROFILE);
       this._profileLerpSpeed = 0.02;
 
+      this._lastFreqData = null;
+      this._lastWaveformData = null;
+
       this._initScene();
       this._createParticles();
       this._createCentralGeo();
       this._createLines();
 
-      this._frameInterval = 1000 / 30;
-      this._lastFrame = 0;
       this._bound_animate = this._animate.bind(this);
       this._bound_resize = this.resize.bind(this);
       window.addEventListener('resize', this._bound_resize);
@@ -142,8 +149,8 @@
       this.scene.fog = new THREE.FogExp2(0x06060b, 0.015);
       this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 120);
       this.camera.position.z = 35;
-      this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false });
-      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+      this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      this.renderer.setPixelRatio(window.devicePixelRatio);
       this.renderer.setSize(window.innerWidth, window.innerHeight);
       this.renderer.setClearColor(0x000000, 0);
       this.container.appendChild(this.renderer.domElement);
@@ -186,8 +193,8 @@
       const count = this.particleCount;
       const positions = new Float32Array(count * 3);
       const sizes = new Float32Array(count);
-      const alphas = new Float32Array(count);
       const phases = new Float32Array(count);
+      const active = new Float32Array(count);
 
       const formation = this.profile.formation;
       const spread = this.profile.spread;
@@ -197,19 +204,30 @@
         positions[i * 3] = p[0];
         positions[i * 3 + 1] = p[1];
         positions[i * 3 + 2] = p[2];
-        sizes[i] = 0.8 + Math.random() * 1.2; // 0.8 - 2.0 range
-        alphas[i] = 0.4 + Math.random() * 0.6;
+        sizes[i] = 1.0 + Math.random() * 1.5;
         phases[i] = Math.random() * Math.PI * 2;
+        active[i] = 0;
       }
+
+      // Assign frequency bins: inner particles = bass, outer = highs
+      const freqBins = new Float32Array(count);
+      for (let i = 0; i < count; i++) {
+        const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
+        const r = Math.sqrt(x * x + y * y + z * z);
+        const normalized = Math.min(r / spread, 1.0);
+        freqBins[i] = Math.floor(normalized * 63);
+      }
+      this._freqBins = freqBins;
 
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
-      geo.setAttribute('aAlpha', new THREE.BufferAttribute(alphas, 1));
       geo.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1));
+      geo.setAttribute('aActive', new THREE.BufferAttribute(active, 1));
 
       this._basePositions = new Float32Array(positions);
       this._targetPositions = new Float32Array(positions);
+      this._activeAttr = geo.attributes.aActive;
 
       const col = this.theme.primary;
       this._particleUniforms = {
@@ -230,7 +248,7 @@
         uniforms: this._particleUniforms,
         transparent: true,
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
+        blending: THREE.NormalBlending,
       });
 
       this.particles = new THREE.Points(geo, mat);
@@ -244,7 +262,7 @@
         color: new THREE.Color(col[0], col[1], col[2]),
         wireframe: true,
         transparent: true,
-        opacity: 0.1,
+        opacity: 0.15,
       });
       this.centralMesh = new THREE.Mesh(geo, mat);
       this.scene.add(this.centralMesh);
@@ -296,11 +314,12 @@
           const dSq = dx * dx + dy * dy + dz * dz;
           if (dSq < threshSq) {
             const fade = 1.0 - Math.sqrt(dSq) / threshold;
+            const opacity = fade * 0.15; // subtle lines
             const idx = segCount * 6;
             lPos[idx] = ix; lPos[idx + 1] = iy; lPos[idx + 2] = iz;
             lPos[idx + 3] = pArr[j * 3]; lPos[idx + 4] = pArr[j * 3 + 1]; lPos[idx + 5] = pArr[j * 3 + 2];
-            lCol[idx] = col[0] * fade; lCol[idx + 1] = col[1] * fade; lCol[idx + 2] = col[2] * fade;
-            lCol[idx + 3] = col[0] * fade; lCol[idx + 4] = col[1] * fade; lCol[idx + 5] = col[2] * fade;
+            lCol[idx] = col[0] * opacity; lCol[idx + 1] = col[1] * opacity; lCol[idx + 2] = col[2] * opacity;
+            lCol[idx + 3] = col[0] * opacity; lCol[idx + 4] = col[1] * opacity; lCol[idx + 5] = col[2] * opacity;
             segCount++;
           }
         }
@@ -340,8 +359,31 @@
       this.lines.material.opacity = this.profile.lineOpacity;
     }
 
+    _updateParticleActivation() {
+      if (!this._lastFreqData) return;
+      const active = this._activeAttr.array;
+      const freq = this._lastFreqData;
+      const bins = this._freqBins;
+      const count = this.particleCount;
+      for (let i = 0; i < count; i++) {
+        const bin = bins[i];
+        const rawVal = (freq[bin] + 100) / 70;
+        const val = Math.max(0, Math.min(1, rawVal));
+        const current = active[i];
+        if (val > current) {
+          active[i] = current + (val - current) * 0.6; // fast attack
+        } else {
+          active[i] = current * 0.92; // slow decay
+        }
+      }
+      this._activeAttr.needsUpdate = true;
+    }
+
     update(frequencyData, waveformData) {
       if (!this.ready) return;
+
+      this._lastFreqData = frequencyData;
+      this._lastWaveformData = waveformData;
 
       if (!frequencyData) {
         this.bass *= 0.95;
@@ -387,7 +429,6 @@
 
       const col = this.theme.primary;
       const sec = this.theme.secondary;
-      // Blend for color uniform
       this._particleUniforms.uColor.value.set(
         col[0] * 0.7 + sec[0] * 0.3,
         col[1] * 0.7 + sec[1] * 0.3,
@@ -403,7 +444,6 @@
       const newProfile = GENRE_PROFILES[genreName] || DEFAULT_PROFILE;
       this.targetProfile = Object.assign({}, newProfile);
 
-      // Compute target positions for smooth formation transition
       const count = this.particleCount;
       const spread = newProfile.spread;
       const formation = newProfile.formation;
@@ -412,6 +452,16 @@
         this._targetPositions[i * 3] = p[0];
         this._targetPositions[i * 3 + 1] = p[1];
         this._targetPositions[i * 3 + 2] = p[2];
+      }
+
+      // Recompute frequency bins for new spread
+      for (let i = 0; i < count; i++) {
+        const x = this._targetPositions[i * 3];
+        const y = this._targetPositions[i * 3 + 1];
+        const z = this._targetPositions[i * 3 + 2];
+        const r = Math.sqrt(x * x + y * y + z * z);
+        const normalized = Math.min(r / spread, 1.0);
+        this._freqBins[i] = Math.floor(normalized * 63);
       }
     }
 
@@ -422,10 +472,8 @@
       this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    _animate(time) {
+    _animate() {
       this._rafId = requestAnimationFrame(this._bound_animate);
-      if (time - this._lastFrame < this._frameInterval) return;
-      this._lastFrame = time;
 
       const elapsed = this.clock.getElapsedTime();
 
@@ -433,17 +481,20 @@
       this._lerpProfile();
       this._lerpPositionsToTarget();
 
+      // Per-particle audio activation
+      this._updateParticleActivation();
+
       // Update uniforms
       this._particleUniforms.uTime.value = elapsed;
       this._particleUniforms.uBass.value = this.bass;
       this._particleUniforms.uMids.value = this.mids;
       this._particleUniforms.uHighs.value = this.highs;
 
-      // Slow rotation of central geometry
+      // Central geometry
       if (this.centralMesh) {
         this.centralMesh.rotation.x = elapsed * 0.05;
         this.centralMesh.rotation.y = elapsed * 0.08;
-        const cScale = 1.0 + this.bass * this.profile.pulseStrength * 0.3;
+        const cScale = 1.0 + this.bass * this.profile.pulseStrength * 0.5;
         this.centralMesh.scale.setScalar(cScale);
       }
 
@@ -457,8 +508,9 @@
       this.camera.position.y = Math.cos(this._orbitAngle * 0.7) * 1;
       this.camera.lookAt(0, 0, 0);
 
-      // Update connections every other frame
-      if (Math.floor(time / this._frameInterval) % 2 === 0) {
+      // Update connections every 3rd frame
+      this._frameCount = (this._frameCount || 0) + 1;
+      if (this._frameCount % 3 === 0) {
         this._updateConnections();
       }
 

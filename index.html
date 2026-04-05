@@ -470,7 +470,29 @@
         <button class="nav-tab active" data-screen="screen-dashboard">Dashboard</button>
       </nav>
 
-      <h2 class="dashboard-title">Your Focus Journey</h2>
+      <!-- Level & XP Hero -->
+      <div class="gamification-hero">
+        <div class="daily-goal-ring">
+          <svg viewBox="0 0 120 120" class="goal-ring-svg">
+            <circle cx="60" cy="60" r="52" class="goal-ring-bg"/>
+            <circle cx="60" cy="60" r="52" class="goal-ring-fill" id="goal-ring-fill"
+                    stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+          </svg>
+          <div class="goal-ring-inner">
+            <span class="goal-ring-percent" id="goal-ring-percent">0%</span>
+            <span class="goal-ring-label">Daily Goal</span>
+          </div>
+        </div>
+        <div class="level-info">
+          <div class="rank-badge" id="rank-badge">Novice</div>
+          <div class="level-text">Level <span id="level-number">0</span></div>
+          <div class="xp-bar-container">
+            <div class="xp-bar-fill" id="xp-bar-fill"></div>
+          </div>
+          <div class="xp-text"><span id="xp-current">0</span> / <span id="xp-next">500</span> XP</div>
+          <div class="total-xp-text"><span id="total-xp">0</span> Total XP</div>
+        </div>
+      </div>
 
       <!-- Stats Overview -->
       <div class="stats-overview">
@@ -490,6 +512,12 @@
           <div class="stat-card-value" id="stat-best-streak">0</div>
           <div class="stat-card-label">Best Streak</div>
         </div>
+      </div>
+
+      <!-- Achievements -->
+      <div class="achievements-section">
+        <h3 class="achievements-title">Achievements <span class="achievements-count" id="achievements-count">0/14</span></h3>
+        <div class="achievements-grid" id="achievements-grid"></div>
       </div>
 
       <!-- Weekly Chart -->
