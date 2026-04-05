@@ -251,20 +251,73 @@
             <button class="toggle-switch" id="music-toggle"></button>
           </div>
 
-          <!-- Genre Selection -->
-          <div class="section-sublabel">Genre</div>
-          <div class="genre-grid">
-            <button class="music-preset-btn active" data-preset="minimal">Minimal</button>
-            <button class="music-preset-btn" data-preset="detroit">Detroit</button>
-            <button class="music-preset-btn" data-preset="acid">Acid</button>
-            <button class="music-preset-btn" data-preset="dubtechno">Dub Techno</button>
-            <button class="music-preset-btn" data-preset="trance">Trance</button>
-            <button class="music-preset-btn" data-preset="dnb">Drum & Bass</button>
-            <button class="music-preset-btn" data-preset="deephouse">Deep House</button>
-            <button class="music-preset-btn" data-preset="progressive">Progressive</button>
-            <button class="music-preset-btn" data-preset="ambienttechno">Ambient Techno</button>
-            <button class="music-preset-btn" data-preset="hardtechno">Hard Techno</button>
+          <!-- Mood-based quick select -->
+          <div class="section-sublabel">Mood</div>
+          <div class="mood-grid">
+            <button class="mood-btn" data-preset="ambienttechno" data-mood="calm">
+              <span class="mood-emoji">&#x1F30A;</span>
+              <span class="mood-name">Calm</span>
+              <span class="mood-desc">Atmospheric, floating</span>
+            </button>
+            <button class="mood-btn" data-preset="dubtechno" data-mood="deep">
+              <span class="mood-emoji">&#x1F300;</span>
+              <span class="mood-name">Deep</span>
+              <span class="mood-desc">Hypnotic, immersive</span>
+            </button>
+            <button class="mood-btn active" data-preset="minimal" data-mood="focused">
+              <span class="mood-emoji">&#x1F3AF;</span>
+              <span class="mood-name">Focused</span>
+              <span class="mood-desc">Minimal, steady</span>
+            </button>
+            <button class="mood-btn" data-preset="deephouse" data-mood="groove">
+              <span class="mood-emoji">&#x1F3B5;</span>
+              <span class="mood-name">Groove</span>
+              <span class="mood-desc">Funky, swinging</span>
+            </button>
+            <button class="mood-btn" data-preset="detroit" data-mood="drive">
+              <span class="mood-emoji">&#x26A1;</span>
+              <span class="mood-name">Drive</span>
+              <span class="mood-desc">Melodic, pushing</span>
+            </button>
+            <button class="mood-btn" data-preset="trance" data-mood="euphoric">
+              <span class="mood-emoji">&#x2728;</span>
+              <span class="mood-name">Euphoric</span>
+              <span class="mood-desc">Soaring, uplifting</span>
+            </button>
+            <button class="mood-btn" data-preset="progressive" data-mood="building">
+              <span class="mood-emoji">&#x1F4C8;</span>
+              <span class="mood-name">Building</span>
+              <span class="mood-desc">Evolving, layered</span>
+            </button>
+            <button class="mood-btn" data-preset="hardtechno" data-mood="intense">
+              <span class="mood-emoji">&#x1F525;</span>
+              <span class="mood-name">Intense</span>
+              <span class="mood-desc">Hard, industrial</span>
+            </button>
           </div>
+
+          <!-- Genre pills (advanced - for users who know genres) -->
+          <details class="genre-details">
+            <summary class="genre-summary">Genre select</summary>
+            <div class="genre-grid">
+              <button class="music-preset-btn active" data-preset="minimal">Minimal</button>
+              <button class="music-preset-btn" data-preset="detroit">Detroit</button>
+              <button class="music-preset-btn" data-preset="acid">Acid 303</button>
+              <button class="music-preset-btn" data-preset="dubtechno">Dub Techno</button>
+              <button class="music-preset-btn" data-preset="trance">Trance</button>
+              <button class="music-preset-btn" data-preset="dnb">DnB</button>
+              <button class="music-preset-btn" data-preset="deephouse">Deep House</button>
+              <button class="music-preset-btn" data-preset="progressive">Progressive</button>
+              <button class="music-preset-btn" data-preset="ambienttechno">Ambient</button>
+              <button class="music-preset-btn" data-preset="hardtechno">Hard Techno</button>
+            </div>
+          </details>
+
+          <!-- Regenerate button -->
+          <button class="btn btn-secondary btn-regenerate" id="btn-regenerate" title="Generate new variation">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Regenerate
+          </button>
 
           <!-- Mixer -->
           <div class="section-sublabel">Mixer</div>
@@ -286,28 +339,27 @@
           </div>
 
           <!-- Beat Controls -->
-          <div class="section-sublabel">Beat Controls</div>
-          <div class="slider-group">
-            <div class="slider-label"><span>BPM</span><span class="slider-value" id="bpm-val">128</span></div>
-            <input type="range" id="bpm-slider" min="70" max="180" value="128">
-          </div>
-          <div class="slider-group">
-            <div class="slider-label"><span>Swing</span><span class="slider-value" id="swing-val">0</span></div>
-            <input type="range" id="swing-slider" min="0" max="30" value="0">
-          </div>
+          <details class="genre-details">
+            <summary class="genre-summary">Beat controls</summary>
+            <div class="slider-group">
+              <div class="slider-label"><span>BPM</span><span class="slider-value" id="bpm-val">128</span></div>
+              <input type="range" id="bpm-slider" min="70" max="180" value="128">
+            </div>
+            <div class="slider-group">
+              <div class="slider-label"><span>Swing</span><span class="slider-value" id="swing-val">0</span></div>
+              <input type="range" id="swing-slider" min="0" max="30" value="0">
+            </div>
+            <div class="slider-group">
+              <div class="slider-label"><span>Bass Filter</span><span class="slider-value" id="bass-cutoff-val">400</span></div>
+              <input type="range" id="bass-cutoff" min="100" max="5000" value="400">
+            </div>
+            <div class="slider-group">
+              <div class="slider-label"><span>Resonance</span><span class="slider-value" id="bass-reso-val">1</span></div>
+              <input type="range" id="bass-reso" min="0" max="20" value="1" step="0.5">
+            </div>
+          </details>
 
-          <!-- Bass Filter -->
-          <div class="section-sublabel">Bass Filter</div>
-          <div class="slider-group">
-            <div class="slider-label"><span>Cutoff</span><span class="slider-value" id="bass-cutoff-val">400</span></div>
-            <input type="range" id="bass-cutoff" min="100" max="5000" value="400">
-          </div>
-          <div class="slider-group">
-            <div class="slider-label"><span>Resonance</span><span class="slider-value" id="bass-reso-val">1</span></div>
-            <input type="range" id="bass-reso" min="0" max="20" value="1" step="0.5">
-          </div>
-
-          <p class="card-hint">All music is procedurally generated &mdash; no samples, no licensing issues</p>
+          <p class="card-hint">All music procedurally generated &mdash; every play is unique</p>
         </div>
 
         <!-- Tasks -->

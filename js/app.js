@@ -351,9 +351,37 @@
       btn.addEventListener('click', () => {
         document.querySelectorAll('.music-preset-btn[data-preset]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        // Sync mood button active state
+        document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+        const matchingMood = document.querySelector('.mood-btn[data-preset="' + btn.dataset.preset + '"]');
+        if (matchingMood) matchingMood.classList.add('active');
         if (audioEngine) {
           audioEngine.setMusicPreset(btn.dataset.preset);
           // Sync BPM and swing sliders to the new preset
+          const bpm = audioEngine.getBPM();
+          const bpmSlider = document.getElementById('bpm-slider');
+          const bpmVal = document.getElementById('bpm-val');
+          if (bpmSlider) bpmSlider.value = Math.round(bpm);
+          if (bpmVal) bpmVal.textContent = Math.round(bpm);
+        }
+        saveAudioSetting('musicPreset', btn.dataset.preset);
+      });
+    });
+
+    // Mood buttons (sync with genre pills and presets)
+    document.querySelectorAll('.mood-btn[data-preset]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Update mood button active state
+        document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        // Also sync genre pill active state
+        document.querySelectorAll('.music-preset-btn[data-preset]').forEach(b => b.classList.remove('active'));
+        const matchingPill = document.querySelector('.music-preset-btn[data-preset="' + btn.dataset.preset + '"]');
+        if (matchingPill) matchingPill.classList.add('active');
+        // Apply preset
+        if (audioEngine) {
+          audioEngine.setMusicPreset(btn.dataset.preset);
+          // Sync BPM slider
           const bpm = audioEngine.getBPM();
           const bpmSlider = document.getElementById('bpm-slider');
           const bpmVal = document.getElementById('bpm-val');
@@ -395,6 +423,19 @@
       if (audioEngine) audioEngine.setBassFilterResonance(parseFloat(v));
       saveAudioSetting('bassReso', v);
     });
+
+    // Regenerate button
+    const btnRegen = document.getElementById('btn-regenerate');
+    if (btnRegen) {
+      btnRegen.addEventListener('click', () => {
+        if (audioEngine && audioEngine.regenerate) {
+          audioEngine.regenerate();
+          // Visual feedback - spin the icon
+          btnRegen.classList.add('spinning');
+          setTimeout(() => btnRegen.classList.remove('spinning'), 600);
+        }
+      });
+    }
 
     // Task management
     initTaskManagement();

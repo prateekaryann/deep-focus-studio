@@ -1654,6 +1654,129 @@ button:focus-visible,
   animation: bgShift 30s ease infinite;
 }
 
+/* Mood Grid */
+.mood-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.mood-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem 0.5rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.mood-btn:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.15);
+}
+
+.mood-btn.active {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: var(--accent);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.mood-emoji {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.mood-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mood-desc {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+/* Genre details (collapsible) */
+.genre-details {
+  margin-bottom: 1rem;
+}
+
+.genre-summary {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.5rem 0;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.genre-summary::-webkit-details-marker {
+  display: none;
+}
+
+.genre-summary::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--text-muted);
+  border-bottom: 1.5px solid var(--text-muted);
+  transform: rotate(-45deg);
+  transition: transform 0.2s;
+}
+
+.genre-details[open] .genre-summary::before {
+  transform: rotate(45deg);
+}
+
+.genre-details[open] .genre-grid,
+.genre-details[open] .slider-group {
+  animation: slideUp 0.3s ease;
+}
+
+/* Regenerate button */
+.btn-regenerate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-regenerate:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.btn-regenerate svg {
+  transition: transform 0.3s;
+}
+
+.btn-regenerate:hover svg {
+  transform: rotate(180deg);
+}
+
 /* -------------------------------------------------------
    17. Keyframe Animations
    ------------------------------------------------------- */
@@ -1718,6 +1841,10 @@ button:focus-visible,
    19. Responsive - Mobile (640px)
    ------------------------------------------------------- */
 @media (max-width: 640px) {
+  .mood-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .timer-display {
     font-size: 3.5rem;
   }
